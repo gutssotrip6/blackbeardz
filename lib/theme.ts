@@ -58,8 +58,8 @@ export function getThemeColors(theme: Theme): ThemeColors {
     hover: 'hover:text-[var(--theme-text)]',
     iconHover: 'hover:bg-[var(--theme-text)]',
     badge: 'bg-[var(--theme-text)]',
-    titleGradient: 'from-black via-gray-700 to-black',
-    activeBg: 'from-black to-gray-800',
+    titleGradient: 'from-black to-black',
+    activeBg: 'from-black to-black',
     marqueeBg: 'bg-gray-100',
     marqueeText: 'text-black',
     cssVars: {

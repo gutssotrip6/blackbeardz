@@ -5,10 +5,24 @@
   --black: #000000;
   --gray-400: #9ca3af;
   --gray-600: #4b5563;
+
+  /* Brand type system (Gymshark-style: bold grotesque display + clean body) */
+  --font-display: 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 html {
   scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+/* Display headings: tight, punchy, athletic */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 /* Custom scrollbar */
@@ -44,11 +58,3 @@ html {
   display: none;
 }
 
-/* Bebas Neue font import */
-@font-face {
-  font-family: 'Bebas Neue';
-  src: url('https://fonts.gstatic.com/s/bebasneue/v14/JTUSjIg69CK48gW7PXoo9Wlhyw.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}

@@ -38,7 +38,7 @@ export default function Footer(_props: FooterProps = {}) {
       >
         <span
           className="text-[18vw] font-black uppercase text-white/[0.025] leading-none whitespace-nowrap"
-          style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+          style={{ fontFamily: 'var(--font-display)' }}
         >
           {siteConfig.name}
         </span>
@@ -51,7 +51,7 @@ export default function Footer(_props: FooterProps = {}) {
             <p className="text-xs uppercase tracking-[0.25em] text-zinc-500 mb-1">New arrivals every week</p>
             <h3
               className="text-3xl md:text-4xl font-black uppercase tracking-wide"
-              style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              style={{ fontFamily: 'var(--font-display)' }}
             >
               Train harder. Look better.
             </h3>
@@ -80,7 +80,7 @@ export default function Footer(_props: FooterProps = {}) {
             />
             <span
               className="text-2xl font-black uppercase tracking-wider"
-              style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              style={{ fontFamily: 'var(--font-display)' }}
             >
               {siteConfig.name}
             </span>

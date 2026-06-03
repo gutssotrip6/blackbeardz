@@ -55,9 +55,9 @@ export default function CartDrawer() {
             <div className="flex flex-col h-full">
               {/* Header */}
               <div className={`flex items-center justify-between p-6 border-b border-gray-200 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <h2 
-                  className="text-2xl font-bold text-black uppercase"
-                  style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                <h2
+                  className="text-2xl font-extrabold text-black uppercase tracking-tight"
+                  style={{ fontFamily: 'var(--font-display)' }}
                 >
                   {t('cart.title')} ({totalItems})
                 </h2>
@@ -175,9 +175,9 @@ function CartItem({
   const optimizedImageUrl = getOptimizedImageUrl(item.product.images[0]?.src);
 
   return (
-    <div className={`flex gap-4 bg-gray-50 border border-gray-200 rounded-lg p-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+    <div className={`flex gap-4 border-b border-zinc-200 pb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
       {/* Image with loading state */}
-      <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 border border-gray-200 rounded overflow-hidden">
+      <div className="relative w-24 h-24 flex-shrink-0 bg-zinc-100 overflow-hidden">
         {!imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
@@ -198,37 +198,38 @@ function CartItem({
 
       {/* Info */}
       <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : ''}`}>
-        <Link 
+        <Link
           href={`/product/${item.product.slug}`}
           onClick={() => setIsOpen(false)}
-          className="block font-medium text-black truncate hover:text-gray-600 transition-colors"
+          className="block font-bold text-black uppercase tracking-tight truncate hover:underline transition-colors"
+          style={{ fontFamily: 'var(--font-display)' }}
         >
           {item.product.name}
         </Link>
-        <p className="text-sm text-gray-600">{t('product.size')}: {item.size}</p>
+        <p className="text-xs text-zinc-500 uppercase tracking-wide mt-0.5">{t('product.size')}: {item.size}</p>
         {item.color && (
-          <p className="text-sm text-gray-600">{t('product.color')}: {item.color}</p>
+          <p className="text-xs text-zinc-500 uppercase tracking-wide">{t('product.color')}: {item.color}</p>
         )}
-        <p className="text-black font-medium">{item.product.price}</p>
+        <p className="text-black font-bold mt-1">{item.product.price}</p>
 
         {/* Quantity Controls */}
         <div className={`flex items-center gap-3 mt-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <button
             onClick={() => updateQuantity(item.product.id, item.size, item.quantity - 1, item.color)}
-            className="w-7 h-7 border border-gray-300 text-black hover:border-black flex items-center justify-center text-sm"
+            className="w-7 h-7 border border-zinc-300 text-black hover:border-black hover:bg-black hover:text-white transition-colors flex items-center justify-center text-sm"
           >
             -
           </button>
-          <span className="text-black w-6 text-center">{item.quantity}</span>
+          <span className="text-black w-6 text-center font-semibold tabular-nums">{item.quantity}</span>
           <button
             onClick={() => updateQuantity(item.product.id, item.size, item.quantity + 1, item.color)}
-            className="w-7 h-7 border border-gray-300 text-black hover:border-black flex items-center justify-center text-sm"
+            className="w-7 h-7 border border-zinc-300 text-black hover:border-black hover:bg-black hover:text-white transition-colors flex items-center justify-center text-sm"
           >
             +
           </button>
           <button
             onClick={() => removeItem(item.product.id, item.size, item.color)}
-            className={`text-gray-500 hover:text-red-400 transition-colors ${isRTL ? 'mr-auto' : 'ml-auto'}`}
+            className={`text-zinc-400 hover:text-black transition-colors ${isRTL ? 'mr-auto' : 'ml-auto'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

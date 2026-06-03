@@ -8,7 +8,7 @@ export default function LogoFallback() {
     <div className="w-full h-full flex items-center justify-center">
       <div 
         className={`${colors.text} text-5xl font-bold tracking-widest`}
-        style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+        style={{ fontFamily: 'var(--font-display)' }}
       >
         Blackbear
       </div>

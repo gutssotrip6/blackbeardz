@@ -107,10 +107,10 @@ export default function StorePage() {
     return (
       <div className="min-h-screen bg-white text-black flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-400 text-xl mb-4">{error}</div>
+          <div className="text-red-500 text-xl mb-4">{error}</div>
           <button
             onClick={() => window.location.reload()}
-            className={`px-6 py-3 ${colors.badge} text-black font-bold uppercase`}
+            className="px-6 py-3 bg-black text-white font-bold uppercase tracking-wider hover:bg-zinc-800 transition-colors"
           >
             {t('form.close')}
           </button>
@@ -121,27 +121,29 @@ export default function StorePage() {
 
   return (
     <div className="relative w-full min-h-screen bg-white text-black overflow-hidden" style={colors.cssVars}>
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-b from-gray-100 via-white to-gray-100 z-0" />
-      <div className="fixed inset-0 bg-white/60 z-10" />
-
       {/* Content — padded to clear the fixed marquee (32px) + nav (56px) = 88px */}
       <div className="relative z-20 pt-[90px]">
 
         {/* Page Header */}
-        <div className="pt-8 pb-8 px-6 md:px-12">
+        <div className="pt-10 pb-6 px-6 md:px-12 max-w-7xl mx-auto">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`text-5xl md:text-7xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r ${colors.titleGradient} uppercase mb-8`}
-            style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+            className={`text-4xl md:text-6xl font-extrabold text-black uppercase tracking-tight mb-1 ${isRTL ? 'text-right' : ''}`}
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             {t('nav.store')}
           </motion.h1>
+          <p className={`text-zinc-500 text-sm mb-8 ${isRTL ? 'text-right' : ''}`}>
+            {filteredProducts.length} {t('store.showing').toLowerCase()}
+          </p>
 
           {/* Search + Sort */}
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 mb-8">
+          <div className="flex flex-col md:flex-row gap-3 mb-6">
             <div className="flex-1 relative">
+              <svg className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
               <input
                 type="text"
                 placeholder={t('store.search')}
@@ -150,17 +152,14 @@ export default function StorePage() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-none text-black placeholder-gray-500 focus:outline-none focus:border-black transition-colors"
+                className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3.5 bg-zinc-100 border border-transparent rounded-none text-black text-sm placeholder-zinc-500 focus:outline-none focus:bg-white focus:border-black transition-colors`}
               />
-              <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
             </div>
 
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-4 py-3 bg-white border border-gray-300 rounded-none text-black focus:outline-none focus:border-black transition-colors cursor-pointer"
+              className="px-4 py-3.5 bg-white border border-zinc-300 rounded-none text-black text-sm uppercase tracking-wide font-semibold focus:outline-none focus:border-black transition-colors cursor-pointer"
             >
               <option value="popular">{t('store.sort.popular')}</option>
               <option value="price-low">{t('store.sort.priceLow')}</option>
@@ -180,33 +179,6 @@ export default function StorePage() {
             theme={currentTheme}
           />
 
-          {/* Price Slider */}
-          <div className="max-w-7xl mx-auto mb-8">
-            <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <span className={`${colors.text} text-sm uppercase tracking-widest`}>{t('store.price')}:</span>
-              <div className="flex-1 relative h-2 bg-gray-200 rounded-full">
-                <input
-                  type="range"
-                  min="1"
-                  max="10000"
-                  step="100"
-                  value={priceRange[1]}
-                  onChange={(e) => {
-                    setPriceRange([1, parseInt(e.target.value)]);
-                    setCurrentPage(1);
-                  }}
-                  className="absolute w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div
-                  className="absolute h-full bg-black rounded-full"
-                  style={{ width: `${((priceRange[1] - 1) / 9999) * 100}%` }}
-                />
-              </div>
-              <span className="text-black text-sm min-w-[120px] text-right">
-                1 - {priceRange[1].toLocaleString()} DA
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Product Grid */}
@@ -229,15 +201,15 @@ export default function StorePage() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-20">
-                <p className="text-gray-400 text-lg">{t('store.noProducts')}</p>
+              <div className="text-center py-24">
+                <p className="text-zinc-400 text-lg uppercase tracking-wide mb-4">{t('store.noProducts')}</p>
                 <button
                   onClick={() => {
                     setActiveFilter('ALL');
                     setPriceRange([1, 10000]);
                     setSearchQuery('');
                   }}
-                  className={`mt-4 ${colors.text} ${colors.hover} underline`}
+                  className="inline-block px-8 py-3 bg-black text-white text-sm font-bold uppercase tracking-wider hover:bg-zinc-800 transition-colors"
                 >
                   {t('store.clearFilters')}
                 </button>
@@ -246,11 +218,11 @@ export default function StorePage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className={`flex justify-center items-center gap-2 mt-12 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className={`flex justify-center items-center gap-2 mt-16 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 border ${colors.border} ${colors.text} disabled:opacity-50 disabled:cursor-not-allowed ${colors.borderHover} transition-colors`}
+                  className="px-5 py-2.5 border border-zinc-300 text-black text-sm font-semibold uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed hover:border-black transition-colors"
                 >
                   {t('nav.previous')}
                 </button>
@@ -260,10 +232,10 @@ export default function StorePage() {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`w-10 h-10 border transition-colors ${
+                      className={`w-10 h-10 border text-sm font-semibold transition-colors ${
                         currentPage === page
-                          ? `${colors.badge} text-black ${colors.border}`
-                          : `${colors.border} ${colors.text} ${colors.borderHover}`
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white text-black border-zinc-300 hover:border-black'
                       }`}
                     >
                       {page}
@@ -274,7 +246,7 @@ export default function StorePage() {
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className={`px-4 py-2 border ${colors.border} ${colors.text} disabled:opacity-50 disabled:cursor-not-allowed ${colors.borderHover} transition-colors`}
+                  className="px-5 py-2.5 border border-zinc-300 text-black text-sm font-semibold uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed hover:border-black transition-colors"
                 >
                   {t('nav.next')}
                 </button>

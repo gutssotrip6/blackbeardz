@@ -19,7 +19,7 @@ interface InlineCheckoutProps {
 
 export default function InlineCheckout({ product, selectedSize, selectedColor, disabled }: InlineCheckoutProps) {
   const { t, isRTL } = useLanguage();
-  const inputClass = 'w-full px-4 py-3 bg-white border border-gray-300 text-black rounded focus:outline-none focus:border-black transition-colors';
+  const inputClass = 'w-full px-4 py-3.5 bg-white border border-zinc-300 text-black text-sm rounded-none focus:outline-none focus:border-black transition-colors';
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('0');
@@ -236,8 +236,8 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
   };
 
   return (
-    <div className={`max-w-3xl mx-auto mt-24 bg-white border border-gray-300 p-8 ${isRTL ? 'text-right' : ''}`}>
-      <h2 className="text-3xl font-bold text-black mb-8 uppercase" style={{ fontFamily: '"Bebas Neue", sans-serif' }}>
+    <div className={`max-w-3xl mx-auto bg-white border border-zinc-300 p-5 md:p-7 ${isRTL ? 'text-right' : ''}`}>
+      <h2 className="text-3xl md:text-4xl font-extrabold text-black mb-8 uppercase tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
         {t('product.checkout')}
       </h2>
 
@@ -267,12 +267,12 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
                   key={qty}
                   type="button"
                   onClick={() => setNumberOfUnits(qty)}
-                  className={`flex items-center justify-between p-3 border rounded-md w-full transition hover:scale-105 ${
-                    numberOfUnits === qty ? 'border-black bg-gray-50' : 'border-gray-300'
+                  className={`flex items-center justify-between p-3 border rounded-none w-full transition-colors ${
+                    numberOfUnits === qty ? 'border-black bg-zinc-50' : 'border-zinc-300 hover:border-black'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="relative w-16 h-16 bg-gray-100 border border-gray-200 rounded overflow-hidden">
+                    <div className="relative w-16 h-16 bg-zinc-100 overflow-hidden">
                       <Image
                         src={product.images[0]?.src || '/placeholder.png'}
                         alt={product.name}
@@ -282,7 +282,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
                     </div>
                     <div className="flex flex-col justify-center">
                       <span className="text-black font-bold">{qty} {t('product.pcs')}</span>
-                      {saveAmount > 0 && <span className="text-sm text-green-700">{t('product.save')} {saveAmount.toLocaleString()}DA</span>}
+                      {saveAmount > 0 && <span className="text-sm font-semibold text-black underline decoration-1 underline-offset-2">{t('product.save')} {saveAmount.toLocaleString()}DA</span>}
                     </div>
                   </div>
                   <div className={`${isRTL ? 'text-left' : 'text-right'}`}>
@@ -313,7 +313,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
                     newAttrs[idx] = { ...newAttrs[idx], size: e.target.value };
                     setUnitAttributes(newAttrs);
                   }}
-                  className="px-2 py-1 bg-white border border-gray-300 text-black rounded"
+                  className="px-2 py-1 bg-white border border-zinc-300 text-black rounded-none text-sm"
                 >
                   {product.attributes
                     .find((a) => a.name.toLowerCase().includes('size'))
@@ -329,7 +329,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
                       newAttrs[idx] = { ...newAttrs[idx], color: e.target.value || undefined };
                       setUnitAttributes(newAttrs);
                     }}
-                    className="px-2 py-1 bg-white border border-gray-300 text-black rounded"
+                    className="px-2 py-1 bg-white border border-zinc-300 text-black rounded-none text-sm"
                   >
                     <option value="">{t('product.color')}</option>
                     {product.attributes
@@ -415,7 +415,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
           </select>
 
           {/* ORDER SUMMARY */}
-          <div className="bg-gray-50 border border-gray-200 p-4 rounded space-y-2">
+          <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-none space-y-2">
             {unitAttributes.map((u, idx) => (
               <div key={idx} className={`flex justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <span className="text-gray-700">
@@ -442,7 +442,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full py-4 bg-black text-white font-bold uppercase hover:bg-gray-800 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-full py-4 bg-black text-white font-bold uppercase tracking-[0.12em] text-sm hover:bg-zinc-800 transition-colors ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSubmitting ? t('form.processing') : t('product.confirmOrder')}
           </button>

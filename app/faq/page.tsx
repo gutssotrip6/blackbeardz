@@ -17,7 +17,7 @@ export default function FAQPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className={`text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r ${colors.titleGradient} uppercase`}
-            style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             FAQ
           </motion.h1>

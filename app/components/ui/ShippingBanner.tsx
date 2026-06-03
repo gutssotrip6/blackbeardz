@@ -44,9 +44,9 @@ export default function ShippingBanner() {
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.4, delay: idx * 0.08 }}
             whileHover={{ y: -3 }}
-            className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-4 py-3.5 md:px-5 md:py-4 transition-all duration-300 hover:border-black hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
+            className="group flex items-center gap-4 border border-zinc-200 bg-white px-4 py-3.5 md:px-5 md:py-4 transition-all duration-300 hover:border-black"
           >
-            <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-lg bg-black text-white transition-transform duration-300 group-hover:scale-105">
+            <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 md:w-11 md:h-11 bg-black text-white transition-transform duration-300 group-hover:scale-105">
               {feature.icon}
             </div>
             <div>

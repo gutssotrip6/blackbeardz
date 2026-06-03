@@ -12,7 +12,7 @@ import Footer from './components/ui/Footer';
 import { getProducts, getCategories } from '@/lib/woocommerce';
 import type { Product } from '@/types/woocommerce';
 import type { WooCategory } from '@/types/woocommerce';
-import { getThemeColors, getThemeForCategory } from '@/lib/theme';
+import { getThemeColors } from '@/lib/theme';
 
 const ShippingBanner = lazy(() => import('./components/ui/ShippingBanner'));
 
@@ -90,17 +90,10 @@ export default function Home() {
       </Head>
 
       <div className="relative w-full min-h-screen bg-white text-black" style={colors.cssVars}>
-        {/* Background */}
-        <div className="fixed inset-0 bg-gradient-to-b from-gray-100 via-white to-gray-100 z-0 pointer-events-none" />
-        <div className="fixed inset-0 bg-white/50 z-10 pointer-events-none" />
-
         {/* Hero Section — full viewport height, category cards */}
         <div className="relative h-[100svh] md:h-screen w-full overflow-hidden z-20">
           <div className="absolute inset-0 pt-[108px] pb-10 md:pt-[165px] md:pb-[60px] flex flex-col md:grid md:grid-cols-2 gap-4 md:gap-8 px-4 md:px-12 z-30">
             {categories && categories.slice(0, 2).map((cat, index) => {
-              const theme = getThemeForCategory(cat.name);
-              const catColors = getThemeColors(theme);
-
               return (
                 <motion.div
                   key={cat.slug}
@@ -124,13 +117,16 @@ export default function Home() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
                     <div className={`absolute bottom-0 ${isRTL ? 'right-0' : 'left-0'} p-4 md:p-8 pointer-events-none`}>
                       <h3
-                        className={`text-3xl md:text-6xl font-bold mb-2 transition-colors text-white ${catColors.hover} uppercase`}
-                        style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                        className="text-3xl md:text-6xl font-extrabold mb-1 text-white uppercase tracking-tight"
+                        style={{ fontFamily: 'var(--font-display)' }}
                       >
                         {cat.name}
                       </h3>
+                      <span className="inline-flex items-center gap-1.5 text-white/90 text-xs md:text-sm font-semibold uppercase tracking-[0.2em]">
+                        {t('product.viewAll')}
+                        <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+                      </span>
                     </div>
-                    <div className={`absolute inset-0 border-2 ${catColors.border} ${catColors.borderHover} transition-all duration-500 pointer-events-none`} />
                   </Link>
                 </motion.div>
               );
@@ -180,7 +176,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-3 border-2 border-black text-black hover:bg-black hover:text-white transition-all duration-300 uppercase tracking-widest font-medium"
+                className="px-12 py-4 bg-black text-white hover:bg-gray-800 transition-all duration-300 uppercase tracking-[0.15em] font-bold text-sm"
               >
                 {t('product.viewAll')}
               </motion.button>

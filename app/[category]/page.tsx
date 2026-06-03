@@ -80,21 +80,20 @@ export default function CategoryPage() {
 
   return (
     <div className="relative w-full min-h-screen bg-white text-black overflow-hidden" style={colors.cssVars}>
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-b from-gray-100 via-white to-gray-100 z-0" />
-      <div className="fixed inset-0 bg-white/60 z-10" />
-
       {/* Content — padded to clear the fixed header (marquee + nav) */}
       <div className="relative z-20 pt-[90px]">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`text-5xl md:text-7xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r ${colors.titleGradient} uppercase mb-8`}
-            style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+            className="text-4xl md:text-6xl font-extrabold text-black uppercase tracking-tight mb-2"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
             {categoryName}
           </motion.h1>
+          <p className="text-zinc-500 text-sm mb-10">
+            {filteredProducts.length} {t('store.showing').toLowerCase()}
+          </p>
 
           {/* Products Grid */}
           {filteredProducts.length > 0 ? (

@@ -70,8 +70,8 @@ export default function StickyHeader() {
               className="object-contain"
             />
             <span
-              className="font-bold text-xl uppercase tracking-wider leading-none hidden sm:block"
-              style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+              className="font-extrabold text-xl uppercase tracking-tight leading-none hidden sm:block"
+              style={{ fontFamily: 'var(--font-display)' }}
             >
               {siteConfig.name}
             </span>
@@ -83,14 +83,14 @@ export default function StickyHeader() {
               <Link
                 key={cat.slug}
                 href={`/${cat.slug}`}
-                className="relative text-[0.78rem] font-semibold text-gray-600 hover:text-black transition-colors uppercase tracking-wider whitespace-nowrap py-1 after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:w-0 after:bg-black after:transition-all after:duration-300 hover:after:w-full"
+                className="relative text-[0.78rem] font-bold text-black hover:text-zinc-500 transition-colors uppercase tracking-wide whitespace-nowrap py-1 after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:w-0 after:bg-black after:transition-all after:duration-300 hover:after:w-full"
               >
                 {cat.name}
               </Link>
             ))}
             <Link
               href="/store"
-              className="relative text-[0.78rem] font-semibold text-gray-600 hover:text-black transition-colors uppercase tracking-wider whitespace-nowrap py-1 after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:w-0 after:bg-black after:transition-all after:duration-300 hover:after:w-full"
+              className="relative text-[0.78rem] font-bold text-black hover:text-zinc-500 transition-colors uppercase tracking-wide whitespace-nowrap py-1 after:absolute after:left-0 after:-bottom-0.5 after:h-[2px] after:w-0 after:bg-black after:transition-all after:duration-300 hover:after:w-full"
             >
               All Products
             </Link>
@@ -106,8 +106,8 @@ export default function StickyHeader() {
               className="relative w-9 h-9 flex items-center justify-center text-black hover:text-gray-500 transition-colors"
               aria-label={t('cart.open')}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              <svg className="w-[22px] h-[22px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
               </svg>
               {totalItems > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-black text-white text-[10px] font-bold flex items-center justify-center rounded-full">
@@ -143,8 +143,8 @@ export default function StickyHeader() {
                 <div className="flex items-center gap-3">
                   <Image src="/favicon.png" alt={siteConfig.name} width={36} height={36} className="object-contain" />
                   <span
-                    className="text-2xl font-bold uppercase tracking-wider"
-                    style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                    className="text-2xl font-extrabold uppercase tracking-tight"
+                    style={{ fontFamily: 'var(--font-display)' }}
                   >
                     {siteConfig.name}
                   </span>
@@ -172,7 +172,7 @@ export default function StickyHeader() {
                     <Link
                       href={link.href}
                       className="flex items-center py-3 px-2 text-[1.6rem] font-bold uppercase text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
-                      style={{ fontFamily: '"Bebas Neue", sans-serif' }}
+                      style={{ fontFamily: 'var(--font-display)' }}
                       onClick={() => setIsMenuOpen(false)}
                     >
                       {link.name}
