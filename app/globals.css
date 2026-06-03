@@ -1,0 +1,54 @@
+/* app/globals.css */
+@import "tailwindcss";
+
+:root {
+  --black: #000000;
+  --gray-400: #9ca3af;
+  --gray-600: #4b5563;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #fff;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, #9ca3af);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, #000000);
+}
+
+/* Selection color */
+::selection {
+  background: var(--selection-bg, #000000);
+  color: #fff;
+}
+
+/* Hide scrollbar for horizontal nav (keeps scroll functionality) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bebas Neue font import */
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('https://fonts.gstatic.com/s/bebasneue/v14/JTUSjIg69CK48gW7PXoo9Wlhyw.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
