@@ -9,7 +9,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: process.env.WOOCOMMERCE_IMAGE_DOMAIN || 'blackbeardz.com',
+        hostname: process.env.WOOCOMMERCE_IMAGE_DOMAIN,
         pathname: '/wp-content/uploads/**',
       },
       {

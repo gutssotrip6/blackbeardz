@@ -208,9 +208,7 @@ export async function POST(request: NextRequest) {
       event_time: body.event_time || Math.floor(Date.now() / 1000),
       event_id: body.event_id,
       context: {
-        page: {
-          url: body.event_source_url || 'https://blackbeardz.com'
-        },
+        ...(body.event_source_url && { page: { url: body.event_source_url } }),
         ...(Object.keys(userContext).length > 0 && { user: userContext })
       },
       ...(Object.keys(properties).length > 0 && { properties })

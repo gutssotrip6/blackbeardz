@@ -53,7 +53,7 @@ export default function Footer(_props: FooterProps = {}) {
               className="text-3xl md:text-4xl font-black uppercase tracking-wide"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              Train harder. Look better.
+              Designed to Dominate
             </h3>
           </div>
           <Link

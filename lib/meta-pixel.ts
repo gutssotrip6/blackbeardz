@@ -25,8 +25,10 @@ class MetaPixel {
   init(): void {
     if (typeof window === 'undefined') return;
     if (this.initialized) return;
+    if (!this.pixelId) return; // never init with an empty id
 
-    // Load Meta Pixel script
+    // Load Meta Pixel script (no-ops if the base loader from the <Script> tag
+    // in the root layout has already defined window.fbq)
     ((f: any, b: any, e?: any, v?: any, n?: any, t?: any, s?: any) => {
       if (f.fbq) return;
       n = f.fbq = function () {
@@ -146,8 +148,10 @@ let metaPixelInstance: MetaPixel | null = null;
 
 export function getMetaPixel(): MetaPixel {
   if (!metaPixelInstance) {
-    // @ts-ignore - Next.js provides NEXT_PUBLIC_ vars in client code
-    const pixelId = process?.env?.NEXT_PUBLIC_META_PIXEL_ID;
+    // Must be the exact `process.env.NEXT_PUBLIC_*` form so Next.js inlines the
+    // value into the client bundle. Optional chaining (process?.env?.) prevents
+    // that replacement and yields `undefined` in the browser.
+    const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
     if (!pixelId) {
       console.warn('NEXT_PUBLIC_META_PIXEL_ID not set - Meta Pixel disabled');
       // Return a no-op instance

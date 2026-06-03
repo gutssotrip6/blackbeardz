@@ -21,7 +21,7 @@ async function sendServerTrackingEvents(
     event_id: eventId,
     event_name: 'Purchase',
     event_time: eventTime,
-    event_source_url: process.env.NEXT_PUBLIC_SITE_URL || 'https://blackbeardz.com',
+    event_source_url: process.env.NEXT_PUBLIC_SITE_URL,
     user_data: {
       email: orderData.billing?.email,
       phone: orderData.billing?.phone,

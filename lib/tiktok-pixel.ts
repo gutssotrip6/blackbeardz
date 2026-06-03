@@ -119,8 +119,9 @@ let tiktokPixelInstance: TikTokPixel | null = null;
 
 export function getTikTokPixel(): TikTokPixel {
   if (!tiktokPixelInstance) {
-    // @ts-ignore - Next.js provides NEXT_PUBLIC_ vars in client code
-    const pixelId = process?.env?.NEXT_PUBLIC_TIKTOK_PIXEL_ID;
+    // Must be the exact `process.env.NEXT_PUBLIC_*` form so Next.js inlines it
+    // into the client bundle (optional chaining prevents that replacement).
+    const pixelId = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID;
     if (!pixelId) {
       console.warn('NEXT_PUBLIC_TIKTOK_PIXEL_ID not set - TikTok Pixel disabled');
       // Return a no-op instance
