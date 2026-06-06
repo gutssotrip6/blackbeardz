@@ -12,45 +12,13 @@ declare global {
 }
 
 class MetaPixel {
-  private initialized = false;
-  private pixelId: string;
-
-  constructor(pixelId: string) {
-    this.pixelId = pixelId;
-  }
-
   /**
-   * Initialize Meta Pixel - loads script once
+   * No-op: the base loader, fbq('init', ...) and the initial PageView are
+   * server-embedded in app/layout.tsx so window.fbq is ready before any
+   * client effect runs. Kept for backwards-compat with TrackingProvider.
    */
   init(): void {
-    if (typeof window === 'undefined') return;
-    if (this.initialized) return;
-    if (!this.pixelId) return; // never init with an empty id
-
-    // Load Meta Pixel script (no-ops if the base loader from the <Script> tag
-    // in the root layout has already defined window.fbq)
-    ((f: any, b: any, e?: any, v?: any, n?: any, t?: any, s?: any) => {
-      if (f.fbq) return;
-      n = f.fbq = function () {
-        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-      } as any;
-      if (!f._fbq) f._fbq = n;
-      n.push = n;
-      n.loaded = !0;
-      n.version = '2.0';
-      n.queue = [];
-      t = b.createElement(e);
-      t.async = !0;
-      t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      s = b.getElementsByTagName(e)[0];
-      s.parentNode?.insertBefore(t, s);
-    })(window, document, 'script');
-
-    // Initialize pixel
-    window.fbq('init', this.pixelId);
-    window.fbq('track', 'PageView');
-
-    this.initialized = true;
+    /* intentionally empty */
   }
 
   /**
@@ -143,22 +111,15 @@ class MetaPixel {
   }
 }
 
-// Singleton instance
+// Singleton instance. The pixel is initialized server-side in app/layout.tsx,
+// so the client just dispatches events to window.fbq — it doesn't need to know
+// the pixel ID. This means tracking still works even if NEXT_PUBLIC_META_PIXEL_ID
+// wasn't inlined into the client bundle at build time.
 let metaPixelInstance: MetaPixel | null = null;
 
 export function getMetaPixel(): MetaPixel {
   if (!metaPixelInstance) {
-    // Must be the exact `process.env.NEXT_PUBLIC_*` form so Next.js inlines the
-    // value into the client bundle. Optional chaining (process?.env?.) prevents
-    // that replacement and yields `undefined` in the browser.
-    const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
-    if (!pixelId) {
-      console.warn('NEXT_PUBLIC_META_PIXEL_ID not set - Meta Pixel disabled');
-      // Return a no-op instance
-      metaPixelInstance = new MetaPixel('');
-    } else {
-      metaPixelInstance = new MetaPixel(pixelId);
-    }
+    metaPixelInstance = new MetaPixel();
   }
   return metaPixelInstance;
 }

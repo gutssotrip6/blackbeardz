@@ -48,12 +48,14 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="relative antialiased bg-white text-black min-h-screen">
-        {/* Meta Pixel base loader — runs early & reliably so window.fbq exists
-            before any event fires. The init + initial PageView are dispatched
-            once from TrackingProvider (this loader no-ops if fbq already set). */}
+        {/* Meta Pixel — base loader + init + initial PageView, server-embedded.
+            The pixel ID is inserted into the HTML at render time, so this works
+            even if NEXT_PUBLIC_META_PIXEL_ID wasn't inlined into the client
+            bundle at build time. Subsequent SPA PageViews come from
+            TrackingProvider (which just calls window.fbq directly). */}
         {metaPixelId && (
-          <Script id="meta-pixel-base" strategy="afterInteractive">
-            {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');`}
+          <Script id="meta-pixel" strategy="afterInteractive">
+            {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${metaPixelId}');fbq('track','PageView');`}
           </Script>
         )}
         {/* Meta Pixel noscript fallback (fires PageView when JS is disabled) */}

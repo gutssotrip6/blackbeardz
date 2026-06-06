@@ -78,8 +78,8 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
 
   // Calculate prices based on fixed discounts
   const getDiscountedPrice = (qty: number) => {
-    if (qty === 2) return basePrice * qty - 400;
-    if (qty === 3) return basePrice * qty - 1200;
+    if (qty === 2) return basePrice * qty - 600;
+    if (qty === 3) return basePrice * qty - 900;
     return basePrice * qty;
   };
 
@@ -189,7 +189,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
           meta_data: [
             ...(u.size && u.size !== 'Default' ? [{ key: 'size', value: u.size }] : []),
             ...(u.color ? [{ key: 'color', value: u.color }] : []),
-            ...(numberOfUnits > 1 ? [{ key: '_discount_applied', value: numberOfUnits === 2 ? '200DA per piece' : '400DA per piece' }] : [])
+            ...(numberOfUnits > 1 ? [{ key: '_discount_applied', value: numberOfUnits === 2 ? '600DA total' : '900DA total' }] : [])
           ]
         })),
         shipping_lines: [
@@ -260,7 +260,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
               const fullPriceQty = basePrice * qty;
               const discountedPrice = getDiscountedPrice(qty);
               const label = qty === 2 ? t('product.mostPopular') : qty === 3 ? t('product.bestOption') : '';
-              const saveAmount = qty === 1 ? 0 : qty === 2 ? 400 : 1200;
+              const saveAmount = qty === 1 ? 0 : qty === 2 ? 600 : 900;
 
               return (
                 <button
