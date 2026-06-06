@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Viewport } from "next";
 import Script from "next/script";
+import { unstable_noStore as noStore } from "next/cache";
 import Providers from "./components/Providers";
 import { siteConfig } from "@/config/site";
 
@@ -17,6 +18,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Opt the layout out of static rendering so process.env is read on every
+  // request. Without this, NEXT_PUBLIC_META_PIXEL_ID would be baked at build
+  // time — meaning changes to the env var on the host wouldn't take effect
+  // until a fresh `next build`. With noStore(), updating the var on Hostinger
+  // and restarting the Node process is enough.
+  noStore();
   const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
   // Get primary color for global theme
   const primaryColor = siteConfig.colors.primary;
@@ -48,6 +55,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="relative antialiased bg-white text-black min-h-screen">
+        {/* DIAGNOSTIC: visible in View Source on production. If you see
+            "missing", the env var isn't reaching the running Node process. */}
+        <div
+          dangerouslySetInnerHTML={{
+            __html: `<!-- meta-pixel-id: ${metaPixelId ? metaPixelId : 'missing'} -->`,
+          }}
+        />
         {/* Meta Pixel — base loader + init + initial PageView, server-embedded.
             The pixel ID is inserted into the HTML at render time, so this works
             even if NEXT_PUBLIC_META_PIXEL_ID wasn't inlined into the client
