@@ -32,8 +32,9 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
   const [orderError, setOrderError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
-  // Upsell & multiple units
-  const [numberOfUnits, setNumberOfUnits] = useState(1);
+  // Upsell & multiple units. Default to 2 — the "most popular" bundle is a
+  // higher-AOV conversion anchor and pre-selecting it lifts bundle take-rate.
+  const [numberOfUnits, setNumberOfUnits] = useState(2);
   const [unitAttributes, setUnitAttributes] = useState<{ size: string; color?: string }[]>([]);
 
   // Delivery fee function (matches CheckoutModal)
@@ -254,25 +255,54 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* UPSALE SECTION */}
-          <div className="space-y-4 mb-6">
+          {/* UPSALE SECTION — conversion-optimized bundle picker */}
+          <div className="space-y-3 mb-6">
             {[1, 2, 3].map((qty) => {
               const fullPriceQty = basePrice * qty;
               const discountedPrice = getDiscountedPrice(qty);
-              const label = qty === 2 ? t('product.mostPopular') : qty === 3 ? t('product.bestOption') : '';
               const saveAmount = qty === 1 ? 0 : qty === 2 ? 600 : 900;
+              const perPiece = Math.round(discountedPrice / qty);
+              const isSelected = numberOfUnits === qty;
+              const isPopular = qty === 2;
+              const isBest = qty === 3;
+              const badge = isPopular
+                ? { text: `🔥 ${t('product.mostPopular')}`, className: 'bg-amber-400 text-black' }
+                : isBest
+                ? { text: `💎 ${t('product.bestOption')}`, className: 'bg-black text-amber-300' }
+                : null;
 
               return (
                 <button
                   key={qty}
                   type="button"
                   onClick={() => setNumberOfUnits(qty)}
-                  className={`flex items-center justify-between p-3 border rounded-none w-full transition-colors ${
-                    numberOfUnits === qty ? 'border-black bg-zinc-50' : 'border-zinc-300 hover:border-black'
+                  className={`relative flex items-center justify-between w-full text-left p-3 ${badge ? 'pt-5' : ''} border-2 rounded-none transition-all ${
+                    isSelected
+                      ? 'border-black bg-white shadow-[0_2px_0_0_#000]'
+                      : 'border-zinc-300 bg-white hover:border-black'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-16 h-16 bg-zinc-100 overflow-hidden">
+                  {/* Ribbon badge */}
+                  {badge && (
+                    <span
+                      className={`absolute -top-2.5 ${isRTL ? 'right-3' : 'left-3'} px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wider ${badge.className}`}
+                    >
+                      {badge.text}
+                    </span>
+                  )}
+
+                  {/* LEFT: radio + thumb + qty + per-piece */}
+                  <div className={`flex items-center gap-3 min-w-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    {/* Radio indicator */}
+                    <span
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        isSelected ? 'border-black bg-black' : 'border-zinc-300 bg-white'
+                      }`}
+                    >
+                      {isSelected && <span className="w-2 h-2 rounded-full bg-white" />}
+                    </span>
+
+                    <div className="relative w-14 h-14 bg-zinc-100 overflow-hidden flex-shrink-0">
                       <Image
                         src={product.images[0]?.src || '/placeholder.png'}
                         alt={product.name}
@@ -280,21 +310,40 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
                         className="object-cover"
                       />
                     </div>
-                    <div className="flex flex-col justify-center">
-                      <span className="text-black font-bold">{qty} {t('product.pcs')}</span>
-                      {saveAmount > 0 && <span className="text-sm font-semibold text-black underline decoration-1 underline-offset-2">{t('product.save')} {saveAmount.toLocaleString()}DA</span>}
+
+                    <div className={`flex flex-col justify-center leading-tight min-w-0 ${isRTL ? 'items-end' : ''}`}>
+                      <span
+                        className="text-black font-extrabold text-base uppercase tracking-tight"
+                        style={{ fontFamily: 'var(--font-display)' }}
+                      >
+                        {qty} {t('product.pcs')}
+                      </span>
+                      {qty > 1 && (
+                        <span className="text-xs text-zinc-500 tabular-nums">
+                          {perPiece.toLocaleString()} DA / {t('product.pcs').slice(0, 2)}
+                        </span>
+                      )}
+                      {saveAmount > 0 && (
+                        <span className="inline-flex w-fit mt-1 px-1.5 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                          ✓ {t('product.save')} {saveAmount.toLocaleString()} DA
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className={`${isRTL ? 'text-left' : 'text-right'}`}>
-                    {label && <p className="text-xs text-gray-700 font-bold">{label}</p>}
-                    {saveAmount > 0 ? (
-                      <div className="flex flex-col items-end">
-                        <span className="text-gray-500 line-through text-sm">{fullPriceQty.toLocaleString()} DA</span>
-                        <span className="text-black font-bold text-lg">{discountedPrice.toLocaleString()} DA</span>
-                      </div>
-                    ) : (
-                      <p className="text-black font-bold text-lg">{discountedPrice.toLocaleString()} DA</p>
+
+                  {/* RIGHT: strikethrough + bold price */}
+                  <div className={`flex flex-col justify-center flex-shrink-0 ${isRTL ? 'text-left items-start' : 'text-right items-end'}`}>
+                    {saveAmount > 0 && (
+                      <span className="text-zinc-400 line-through text-xs tabular-nums">
+                        {fullPriceQty.toLocaleString()} DA
+                      </span>
                     )}
+                    <span
+                      className="text-black font-extrabold text-xl tabular-nums leading-none"
+                      style={{ fontFamily: 'var(--font-display)' }}
+                    >
+                      {discountedPrice.toLocaleString()} DA
+                    </span>
                   </div>
                 </button>
               );
