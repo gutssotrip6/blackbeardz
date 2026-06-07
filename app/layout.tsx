@@ -1,6 +1,5 @@
 import "./globals.css";
 import type { Viewport } from "next";
-import Script from "next/script";
 import { unstable_noStore as noStore } from "next/cache";
 import Providers from "./components/Providers";
 import { siteConfig } from "@/config/site";
@@ -52,26 +51,25 @@ export default function RootLayout({
         <meta name="google" content="notranslate" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://connect.facebook.net" />
         <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+        {/* DIAGNOSTIC: visible in View Source. If you see "missing", the env
+            var isn't reaching the running Node process. */}
+        <meta name="x-meta-pixel-id" content={metaPixelId ? metaPixelId : 'missing'} />
+
+        {/* Meta Pixel — canonical install, placed in <head> and run inline so
+            it fires before React hydration. Anything queued before fbevents.js
+            finishes loading is replayed when it does. */}
+        {metaPixelId && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${metaPixelId}');fbq('track','PageView');try{console.info('[meta-pixel] init',${JSON.stringify(metaPixelId)});}catch(e){}`,
+            }}
+          />
+        )}
       </head>
       <body className="relative antialiased bg-white text-black min-h-screen">
-        {/* DIAGNOSTIC: visible in View Source on production. If you see
-            "missing", the env var isn't reaching the running Node process. */}
-        <div
-          dangerouslySetInnerHTML={{
-            __html: `<!-- meta-pixel-id: ${metaPixelId ? metaPixelId : 'missing'} -->`,
-          }}
-        />
-        {/* Meta Pixel — base loader + init + initial PageView, server-embedded.
-            The pixel ID is inserted into the HTML at render time, so this works
-            even if NEXT_PUBLIC_META_PIXEL_ID wasn't inlined into the client
-            bundle at build time. Subsequent SPA PageViews come from
-            TrackingProvider (which just calls window.fbq directly). */}
-        {metaPixelId && (
-          <Script id="meta-pixel" strategy="afterInteractive">
-            {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${metaPixelId}');fbq('track','PageView');`}
-          </Script>
-        )}
         {/* Meta Pixel noscript fallback (fires PageView when JS is disabled) */}
         {metaPixelId && (
           <noscript>

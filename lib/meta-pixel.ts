@@ -25,15 +25,20 @@ class MetaPixel {
    * Track a standard Meta Pixel event
    */
   track(eventName: TrackingEventName, customData?: any, eventId?: string): void {
-    if (typeof window === 'undefined' || !window.fbq) return;
+    if (typeof window === 'undefined') return;
+    if (!window.fbq) {
+      console.warn('[meta-pixel] window.fbq not ready, dropping', eventName);
+      return;
+    }
 
     const finalEventId = eventId || generateEventId();
-    
+
     // Mark event as processed for deduplication
     markEventProcessed(finalEventId);
 
     // Track with event ID for deduplication
     window.fbq('track', eventName, customData, { eventID: finalEventId });
+    console.info('[meta-pixel] track', eventName, { customData, eventId: finalEventId });
   }
 
   /**
@@ -46,6 +51,7 @@ class MetaPixel {
     markEventProcessed(finalEventId);
 
     window.fbq('trackCustom', eventName, customData, { eventID: finalEventId });
+    console.info('[meta-pixel] trackCustom', eventName, { customData, eventId: finalEventId });
   }
 
   /**
