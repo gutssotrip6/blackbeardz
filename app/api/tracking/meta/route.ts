@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TrackingEventData, ServerTrackingResponse } from '@/types/tracking';
 
+export const dynamic = 'force-dynamic';
+
 const META_CONVERSIONS_API_URL = 'https://graph.facebook.com/v19.0/{pixel_id}/events';
 
 interface MetaEvent {
@@ -175,6 +177,21 @@ export async function POST(request: NextRequest) {
       if (body.user_data.country) {
         userData.country = await hashData(body.user_data.country.toLowerCase().trim());
       }
+    }
+
+    // Non-hashed identifiers — these are what let Meta match server events to
+    // real people, which is the difference between an event being "received"
+    // and "attributed". fbp/fbc come from the browser cookies; IP + UA come
+    // from the request headers (only when proxied from a real browser, so the
+    // internal server-to-server order call doesn't attach the server's own IP).
+    if (body.fbp) userData.fbp = body.fbp;
+    if (body.fbc) userData.fbc = body.fbc;
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : '';
+    if (clientIp) {
+      userData.client_ip_address = clientIp;
+      const ua = request.headers.get('user-agent');
+      if (ua) userData.client_user_agent = ua;
     }
 
     // Prepare custom data

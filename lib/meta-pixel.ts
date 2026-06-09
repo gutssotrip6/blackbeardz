@@ -11,6 +11,14 @@ declare global {
   }
 }
 
+/** Read a browser cookie by name (used for Meta's _fbp / _fbc). */
+function readCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const escaped = name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1');
+  const match = document.cookie.match(new RegExp('(?:^|; )' + escaped + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 class MetaPixel {
   /**
    * No-op: the base loader, fbq('init', ...) and the initial PageView are
@@ -22,23 +30,58 @@ class MetaPixel {
   }
 
   /**
-   * Track a standard Meta Pixel event
+   * Mirror an event to the server-side Conversions API. This is what makes
+   * "every event get recorded": the browser pixel can be blocked by ad
+   * blockers / ITP / network filters, but a server event cannot. Both carry
+   * the same event_id so Meta de-duplicates them into a single event.
+   */
+  private sendServerEvent(eventName: TrackingEventName, eventId: string, customData?: any): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = {
+        event_id: eventId,
+        event_name: eventName,
+        event_time: Math.floor(Date.now() / 1000),
+        event_source_url: window.location.href,
+        custom_data: customData,
+        fbp: readCookie('_fbp'),
+        fbc: readCookie('_fbc'),
+      };
+      // keepalive lets the request finish even if the user navigates away
+      // (important for Purchase / InitiateCheckout).
+      fetch('/api/tracking/meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify(payload),
+      }).catch(() => {/* tracking must never break the UI */});
+    } catch {
+      /* swallow — tracking must never throw */
+    }
+  }
+
+  /**
+   * Track a standard Meta Pixel event (browser pixel + server CAPI).
    */
   track(eventName: TrackingEventName, customData?: any, eventId?: string): void {
     if (typeof window === 'undefined') return;
-    if (!window.fbq) {
-      console.warn('[meta-pixel] window.fbq not ready, dropping', eventName);
-      return;
-    }
 
     const finalEventId = eventId || generateEventId();
 
     // Mark event as processed for deduplication
     markEventProcessed(finalEventId);
 
-    // Track with event ID for deduplication
-    window.fbq('track', eventName, customData, { eventID: finalEventId });
-    console.info('[meta-pixel] track', eventName, { customData, eventId: finalEventId });
+    // 1) Browser pixel (best-effort — may be blocked)
+    if (window.fbq) {
+      window.fbq('track', eventName, customData, { eventID: finalEventId });
+    } else {
+      console.warn('[meta-pixel] window.fbq not ready (browser pixel skipped)');
+    }
+
+    // 2) Server-side Conversions API (always fires, can't be blocked)
+    this.sendServerEvent(eventName, finalEventId, customData);
+
+    console.info('[meta-pixel] track', eventName, { eventId: finalEventId });
   }
 
   /**

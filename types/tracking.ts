@@ -22,6 +22,10 @@ export interface TrackingEventData {
   event_name: TrackingEventName;
   event_time?: number;
   event_source_url?: string;
+  /** Meta browser cookie (_fbp) — passed through unhashed to the CAPI. */
+  fbp?: string;
+  /** Meta click id cookie (_fbc) — passed through unhashed to the CAPI. */
+  fbc?: string;
   user_data?: {
     email?: string;
     phone?: string;
