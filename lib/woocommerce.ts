@@ -48,6 +48,10 @@ async function wooFetch(endpoint: string, params: Record<string, string> = {}, t
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       signal: controller.signal,
+      // Always pull live prices/stock from WooCommerce. Without this, Next.js
+      // server-side caches the response indefinitely (default fetch cache),
+      // so price/stock edits in WP admin wouldn't show until the next deploy.
+      cache: 'no-store',
     });
     
     clearTimeout(timeoutId);

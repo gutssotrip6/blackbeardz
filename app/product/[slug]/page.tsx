@@ -3,18 +3,11 @@ import { notFound } from 'next/navigation';
 import ProductClient from '../../components/product/ProductClient';
 import { getProductBySlug, getProducts } from '@/lib/woocommerce';
 
-// Generate static pages for all products at build time (optional but recommended)
-export async function generateStaticParams() {
-  try {
-    const products = await getProducts({ per_page: 100 });
-    return products.map((product) => ({
-      slug: product.slug,
-    }));
-  } catch (error) {
-    console.error('Failed to generate static params:', error);
-    return [];
-  }
-}
+// Always render per-request so price/stock changes in WooCommerce appear
+// immediately, without a redeploy. Combined with cache: 'no-store' in
+// wooFetch, every page hit fetches fresh data from the WooCommerce API.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Dynamic metadata for SEO
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
