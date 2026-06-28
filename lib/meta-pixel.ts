@@ -21,12 +21,46 @@ function readCookie(name: string): string | undefined {
 
 class MetaPixel {
   /**
-   * No-op: the base loader, fbq('init', ...) and the initial PageView are
-   * server-embedded in app/layout.tsx so window.fbq is ready before any
-   * client effect runs. Kept for backwards-compat with TrackingProvider.
+   * Fallback initializer. The pixel is normally loaded + inited + PageView'd
+   * by the canonical inline snippet in app/layout.tsx <head>. This runs from
+   * TrackingProvider as a safety net: if for any reason window.fbq is missing
+   * (inline script blocked, stripped, or didn't execute), we load the pixel
+   * ourselves. The pixel id is read from the server-rendered <meta> tag, so it
+   * works even when NEXT_PUBLIC_META_PIXEL_ID wasn't inlined into the client
+   * bundle at build time.
    */
   init(): void {
-    /* intentionally empty */
+    if (typeof window === 'undefined') return;
+    if (window.fbq) return; // already set up by the <head> snippet — nothing to do
+
+    const id = document
+      .querySelector('meta[name="x-meta-pixel-id"]')
+      ?.getAttribute('content');
+    if (!id || id === 'missing') {
+      console.warn('[meta-pixel] no pixel id found (meta tag) — cannot init');
+      return;
+    }
+
+    ((f: any, b: any, e?: any, v?: any, n?: any, t?: any, s?: any) => {
+      if (f.fbq) return;
+      n = f.fbq = function () {
+        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+      } as any;
+      if (!f._fbq) f._fbq = n;
+      n.push = n;
+      n.loaded = !0;
+      n.version = '2.0';
+      n.queue = [];
+      t = b.createElement(e);
+      t.async = !0;
+      t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+      s = b.getElementsByTagName(e)[0];
+      s.parentNode?.insertBefore(t, s);
+    })(window, document, 'script');
+
+    window.fbq('init', id);
+    window.fbq('track', 'PageView');
+    console.info('[meta-pixel] fallback init + PageView', id);
   }
 
   /**

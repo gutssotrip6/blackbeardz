@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { getMetaPixel } from '@/lib/meta-pixel';
 import { getTikTokPixel } from '@/lib/tiktok-pixel';
@@ -11,18 +11,23 @@ import { generateEventId } from '@/lib/tracking-utils';
 
 export default function TrackingProvider() {
   const pathname = usePathname();
+  // The inline <head> snippet fires the very first PageView, so skip the first
+  // run of the navigation effect to avoid double-counting it.
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
-    // Meta is initialised by the inline <head> script in layout.tsx.
-    // TikTok just needs configuring here.
+    // Safety net: if the inline <head> snippet didn't run, this loads + inits
+    // the Meta pixel (and fires its first PageView) from the meta-tag id.
+    getMetaPixel().init();
     getTikTokPixel().init();
   }, []);
 
   useEffect(() => {
-    // Fire a PageView on first load AND every SPA navigation. pageView() →
-    // track() sends both the browser pixel and the server-side CAPI event
-    // (same event_id, so Meta de-duplicates), so PageViews are recorded even
-    // when the browser pixel is blocked.
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    // Every SPA navigation → browser pixel + server CAPI (same event_id).
     const eventId = generateEventId();
     getMetaPixel().pageView(eventId);
     getTikTokPixel().pageView(eventId);
