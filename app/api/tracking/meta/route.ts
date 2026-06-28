@@ -6,7 +6,7 @@ import { TrackingEventData, ServerTrackingResponse } from '@/types/tracking';
 
 export const dynamic = 'force-dynamic';
 
-const META_CONVERSIONS_API_URL = 'https://graph.facebook.com/v19.0/{pixel_id}/events';
+const META_CONVERSIONS_API_URL = 'https://graph.facebook.com/v21.0/{pixel_id}/events';
 
 interface MetaEvent {
   event_name: string;
@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
     if (!pixelId || !accessToken) {
       console.error('Meta Conversions API credentials not configured');
       return NextResponse.json(
-        { success: false, message: 'Meta credentials not configured' },
-        { status: 500 }
+        { success: false, message: 'Meta credentials not configured (META_PIXEL_ID / META_ACCESS_TOKEN missing at runtime)' },
+        { status: 200 }
       );
     }
 
@@ -186,12 +186,24 @@ export async function POST(request: NextRequest) {
     // internal server-to-server order call doesn't attach the server's own IP).
     if (body.fbp) userData.fbp = body.fbp;
     if (body.fbc) userData.fbc = body.fbc;
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : '';
-    if (clientIp) {
-      userData.client_ip_address = clientIp;
-      const ua = request.headers.get('user-agent');
-      if (ua) userData.client_user_agent = ua;
+    // Always attach the User-Agent. Meta's CAPI rejects any event whose
+    // user_data has no identifiers, so the UA (present on every browser
+    // request) guarantees user_data is never empty even for a brand-new
+    // visitor with no _fbp cookie yet.
+    const ua = request.headers.get('user-agent');
+    if (ua) userData.client_user_agent = ua;
+    const clientIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      request.headers.get('cf-connecting-ip') ||
+      '';
+    if (clientIp) userData.client_ip_address = clientIp;
+
+    // Final guard: if we somehow still have no identifiers, synthesize one from
+    // the event id so Meta never rejects the event outright. (external_id is a
+    // valid user_data key and gets hashed by Meta automatically.)
+    if (Object.keys(userData).length === 0) {
+      userData.external_id = await hashData(body.event_id);
     }
 
     // Prepare custom data
@@ -237,11 +249,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response);
 
   } catch (error) {
+    // A tracking beacon must never surface as an app error in the browser
+    // console — return 200 with the detail in the body so it's diagnosable
+    // (inspect the response of /api/tracking/meta) without red 500 spam.
     console.error('Meta Conversions API error:', error);
     const response: ServerTrackingResponse = {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error'
     };
-    return NextResponse.json(response, { status: 500 });
+    return NextResponse.json(response, { status: 200 });
   }
 }
