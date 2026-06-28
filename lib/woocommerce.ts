@@ -35,17 +35,26 @@ async function wooFetch(endpoint: string, params: Record<string, string> = {}, t
   const queryParams = new URLSearchParams({
     consumer_key: CONSUMER_KEY || '',
     consumer_secret: CONSUMER_SECRET || '',
-    ...params
+    ...params,
+    // Cache-buster: a unique value per request makes the URL unique, so no
+    // upstream cache (WordPress page/object cache, LiteSpeed/WP Rocket,
+    // Cloudflare, or the browser) can serve a stale price. This is what makes
+    // price edits in WooCommerce show up instantly on the next reload.
+    _: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   });
-  
+
   const url = `${API_URL}/wp-json/wc/v3/${endpoint}?${queryParams.toString()}`;
-  
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  
+
   try {
     const response = await fetch(url, {
       method: 'GET',
+      // Keep only CORS-safelisted headers here: the listing pages fetch this
+      // cross-origin from the browser, and adding Cache-Control/Pragma request
+      // headers would trigger a CORS preflight that WooCommerce may reject.
+      // Freshness is handled by the URL cache-buster above + cache:'no-store'.
       headers: { 'Accept': 'application/json' },
       signal: controller.signal,
       // Always pull live prices/stock from WooCommerce. Without this, Next.js
