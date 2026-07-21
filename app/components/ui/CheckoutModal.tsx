@@ -11,6 +11,7 @@ import { getTikTokPixel } from '@/lib/tiktok-pixel';
 import { generateEventId, extractPriceValue } from '@/lib/tracking-utils';
 import { TrackingContentItem } from '@/types/tracking';
 import { getThemeColors } from '@/lib/theme';
+import { getBundlePrice } from '@/lib/bundle-pricing';
 
 // Simple cache for prices
 const priceCache = new Map<number, number>();
@@ -128,11 +129,7 @@ export default function CheckoutModal() {
     ? getCurrentPrice(singleProduct.product.id, singleProduct.product.price)
     : 0;
 
-  const getDiscountedPrice = (qty: number) => {
-    if (qty === 2) return basePrice * qty - 600;
-    if (qty === 3) return basePrice * qty - 900;
-    return basePrice * qty;
-  };
+  const getDiscountedPrice = (qty: number) => getBundlePrice(singleProduct?.product.slug, basePrice, qty);
 
   const discountedTotalPrice = singleProduct ? getDiscountedPrice(numberOfUnits) : 0;
 

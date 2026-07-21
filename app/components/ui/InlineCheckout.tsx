@@ -9,6 +9,7 @@ import { getMetaPixel } from '@/lib/meta-pixel';
 import { getTikTokPixel } from '@/lib/tiktok-pixel';
 import { generateEventId } from '@/lib/tracking-utils';
 import { TrackingContentItem } from '@/types/tracking';
+import { getBundlePrice } from '@/lib/bundle-pricing';
 
 interface InlineCheckoutProps {
   product: Product;
@@ -77,12 +78,8 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
 
   const basePrice = parseInt(product.price.replace(/\D/g, ''));
 
-  // Calculate prices based on fixed discounts
-  const getDiscountedPrice = (qty: number) => {
-    if (qty === 2) return basePrice * qty - 600;
-    if (qty === 3) return basePrice * qty - 900;
-    return basePrice * qty;
-  };
+  // Calculate prices based on fixed discounts (or a per-product override)
+  const getDiscountedPrice = (qty: number) => getBundlePrice(product.slug, basePrice, qty);
 
   const discountedTotalPrice = getDiscountedPrice(numberOfUnits);
   const subtotal = discountedTotalPrice;
