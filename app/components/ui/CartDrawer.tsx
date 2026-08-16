@@ -210,7 +210,9 @@ function CartItem({
         {item.color && (
           <p className="text-xs text-zinc-500 uppercase tracking-wide">{t('product.color')}: {item.color}</p>
         )}
-        <p className="text-black font-bold mt-1">{item.product.price}</p>
+        {/* Show what the shopper is actually charged — a product on sale is
+            billed at its sale price, so the regular price alone would misquote. */}
+        <p className="text-black font-bold mt-1">{item.product.sale_price || item.product.price}</p>
 
         {/* Quantity Controls */}
         <div className={`flex items-center gap-3 mt-2 ${isRTL ? 'flex-row-reverse' : ''}`}>

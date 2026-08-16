@@ -91,6 +91,24 @@ export async function getProducts(params?: any): Promise<Product[]> {
   }
 }
 
+/**
+ * Fetches specific products by id, straight from WooCommerce.
+ *
+ * Used by the order route to re-price every line item against live data, so
+ * this must never be served from a cache — see wooFetch.
+ */
+export async function getProductsByIds(ids: number[]): Promise<Product[]> {
+  const unique = Array.from(new Set(ids.filter(id => Number.isFinite(id))));
+  if (unique.length === 0) return [];
+
+  const data = await wooFetch('products', {
+    include: unique.join(','),
+    per_page: String(Math.max(unique.length, 10)),
+  }, 15000);
+
+  return transformProducts(data);
+}
+
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   try {
     const data = await wooFetch('products', { slug }, 10000);

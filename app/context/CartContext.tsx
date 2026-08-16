@@ -4,7 +4,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Product } from '@/types/woocommerce';
 import { getMetaPixel } from '@/lib/meta-pixel';
 import { getTikTokPixel } from '@/lib/tiktok-pixel';
-import { generateEventId, extractPriceValue } from '@/lib/tracking-utils';
+import { generateEventId } from '@/lib/tracking-utils';
+import { getEffectiveUnitPrice } from '@/lib/pricing';
 import { TrackingContentItem } from '@/types/tracking';
 import { siteConfig } from '@/config/site';
 
@@ -50,6 +51,46 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setIsLoaded(true);
   }, []);
 
+  // A cart in localStorage is a snapshot of the catalog from whenever the item
+  // was added — it can be days old and its price long since changed in
+  // WooCommerce. Re-pull the live product for every cart line so the drawer and
+  // the checkout never show a price the store no longer charges.
+  useEffect(() => {
+    if (!isLoaded || items.length === 0) return;
+
+    const ids = Array.from(new Set(items.map(item => item.product.id)));
+    let cancelled = false;
+
+    const refreshCartProducts = async () => {
+      try {
+        const response = await fetch(`/api/products?ids=${ids.join(',')}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const fresh: Product[] = await response.json();
+        if (cancelled || !Array.isArray(fresh) || fresh.length === 0) return;
+
+        const freshById = new Map(fresh.map(product => [product.id, product]));
+        setItems(current => {
+          let changed = false;
+          const next = current.map(item => {
+            const live = freshById.get(item.product.id);
+            if (!live || JSON.stringify(live) === JSON.stringify(item.product)) return item;
+            changed = true;
+            return { ...item, product: live };
+          });
+          return changed ? next : current;
+        });
+      } catch (error) {
+        console.error('Failed to refresh cart products:', error);
+      }
+    };
+
+    refreshCartProducts();
+    return () => { cancelled = true; };
+    // Runs on mount and whenever the set of products in the cart changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, items.map(item => item.product.id).sort((a, b) => a - b).join(',')]);
+
   // Save to localStorage when items change
   useEffect(() => {
     if (isLoaded) {
@@ -79,7 +120,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       // Track AddToCart event with both Meta and TikTok pixels
       const eventId = generateEventId();
-      const price = extractPriceValue(product.price);
+      const price = getEffectiveUnitPrice(product);
       const contentItem: TrackingContentItem = {
         id: String(product.id),
         quantity: 1,
@@ -133,10 +174,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   
-  const totalPrice = items.reduce((sum, item) => {
-    const price = parseInt(item.product.price.replace(/\D/g, '')) || 0;
-    return sum + price * item.quantity;
-  }, 0);
+  const totalPrice = items.reduce(
+    (sum, item) => sum + getEffectiveUnitPrice(item.product) * item.quantity,
+    0
+  );
 
   return (
     <CartContext.Provider

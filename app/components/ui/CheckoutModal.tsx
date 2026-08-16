@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { useCart } from '@/app/context/CartContext';
+import { useCart, CartItem } from '@/app/context/CartContext';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { wilayasData } from '@/app/data/wilayas-data';
 import { getMetaPixel } from '@/lib/meta-pixel';
@@ -11,16 +11,8 @@ import { getTikTokPixel } from '@/lib/tiktok-pixel';
 import { generateEventId, extractPriceValue } from '@/lib/tracking-utils';
 import { TrackingContentItem } from '@/types/tracking';
 import { getThemeColors } from '@/lib/theme';
-import { getBundlePrice } from '@/lib/bundle-pricing';
-
-// Simple cache for prices
-const priceCache = new Map<number, number>();
-
-interface ProductFromAPI {
-  id: number;
-  price: string;
-  sale_price?: string;
-}
+import { getBundleDiscount, getBundlePrice, getEffectiveUnitPrice, splitBundleTotal } from '@/lib/pricing';
+import { useLivePrices } from '@/app/hooks/useLivePrices';
 
 export default function CheckoutModal() {
   const { items, isCheckoutOpen, setIsCheckoutOpen, clearCart } = useCart();
@@ -29,9 +21,11 @@ export default function CheckoutModal() {
 
   const singleProduct = items.length === 1 ? items[0] : null;
 
-  // Fresh prices state
-  const [freshPrices, setFreshPrices] = useState<Map<number, number>>(new Map());
-  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  // Prices always come from WooCommerce, never from the cart snapshot in
+  // localStorage — that snapshot can be arbitrarily old.
+  const { prices: livePrices, isLoading: isLoadingPrices } = useLivePrices(
+    items.map(item => item.product.id)
+  );
 
   // Form state
   const [firstName, setFirstName] = useState('');
@@ -68,52 +62,13 @@ export default function CheckoutModal() {
     ? wilayasData.find(w => w.name === selectedWilaya)?.cities || []
     : [];
 
-  // Fetch fresh prices when modal opens
-  useEffect(() => {
-    if (!isCheckoutOpen || items.length === 0) return;
-
-    const fetchFreshPrices = async () => {
-      setIsLoadingPrices(true);
-      const newPrices = new Map<number, number>();
-
-      try {
-        const response = await fetch('/api/products');
-        if (!response.ok) throw new Error('Failed to fetch');
-        
-        const allProducts: ProductFromAPI[] = await response.json();
-        
-        items.forEach(item => {
-          const freshProduct = allProducts.find(p => p.id === item.product.id);
-          
-          if (freshProduct) {
-            const priceString = freshProduct.sale_price || freshProduct.price;
-            const numericPrice = parseInt(priceString.replace(/\D/g, ''));
-            newPrices.set(item.product.id, numericPrice);
-            priceCache.set(item.product.id, numericPrice);
-          } else {
-            const fallbackPrice = parseInt(item.product.price.replace(/\D/g, ''));
-            newPrices.set(item.product.id, fallbackPrice);
-          }
-        });
-      } catch (err) {
-        items.forEach(item => {
-          const fallbackPrice = parseInt(item.product.price.replace(/\D/g, ''));
-          newPrices.set(item.product.id, fallbackPrice);
-        });
-      }
-
-      setFreshPrices(newPrices);
-      setIsLoadingPrices(false);
-    };
-
-    fetchFreshPrices();
-  }, [isCheckoutOpen, items]);
-
-  const getCurrentPrice = useCallback((productId: number, fallbackPrice: string): number => {
-    const freshPrice = freshPrices.get(productId);
-    if (freshPrice !== undefined) return freshPrice;
-    return parseInt(fallbackPrice.replace(/\D/g, ''));
-  }, [freshPrices]);
+  const getCurrentPrice = useCallback((item: CartItem): number => {
+    const livePrice = livePrices.get(item.product.id)?.unitPrice;
+    if (livePrice !== undefined) return livePrice;
+    // Only reached while the live fetch is still in flight or after it failed.
+    // The order route re-prices server-side either way.
+    return getEffectiveUnitPrice(item.product);
+  }, [livePrices]);
 
   useEffect(() => {
     if (singleProduct) {
@@ -125,20 +80,18 @@ export default function CheckoutModal() {
     }
   }, [singleProduct, numberOfUnits]);
 
-  const basePrice = singleProduct 
-    ? getCurrentPrice(singleProduct.product.id, singleProduct.product.price)
-    : 0;
+  const basePrice = singleProduct ? getCurrentPrice(singleProduct) : 0;
 
   const getDiscountedPrice = (qty: number) => getBundlePrice(singleProduct?.product.slug, basePrice, qty);
 
   const discountedTotalPrice = singleProduct ? getDiscountedPrice(numberOfUnits) : 0;
+  const bundleDiscount = getBundleDiscount(singleProduct?.product.slug, numberOfUnits);
+  // Split so the per-unit lines always add back up to the advertised total.
+  const unitPrices = splitBundleTotal(discountedTotalPrice, numberOfUnits);
 
-  const subtotal = singleProduct 
-    ? discountedTotalPrice 
-    : items.reduce((sum, item) => {
-        const itemPrice = getCurrentPrice(item.product.id, item.product.price);
-        return sum + itemPrice * item.quantity;
-      }, 0);
+  const subtotal = singleProduct
+    ? discountedTotalPrice
+    : items.reduce((sum, item) => sum + getCurrentPrice(item) * item.quantity, 0);
 
   const deliveryFee = deliveryMethod === 'bureau' ? bureauFee : domicileFee;
   const total = subtotal + deliveryFee;
@@ -153,7 +106,6 @@ export default function CheckoutModal() {
     setOrderError(null);
     setPhoneError(null);
     setNumberOfUnits(2);
-    setFreshPrices(new Map());
     if (singleProduct) {
       setUnitAttributes([{ size: singleProduct.size || 'Default', color: singleProduct.color || undefined }]);
     }
@@ -215,17 +167,17 @@ export default function CheckoutModal() {
     // Track InitiateCheckout event with both Meta and TikTok pixels
     const eventId = generateEventId();
     const contents: TrackingContentItem[] = singleProduct
-      ? unitAttributes.map(u => ({
+      ? unitAttributes.map((u, idx) => ({
           id: String(singleProduct.product.id),
           quantity: 1,
-          item_price: Math.round(discountedTotalPrice / numberOfUnits),
+          item_price: unitPrices[idx],
           title: singleProduct.product.name,
           category: singleProduct.product.categories[0]?.name
         }))
       : items.map(item => ({
           id: String(item.product.id),
           quantity: item.quantity,
-          item_price: getCurrentPrice(item.product.id, item.product.price),
+          item_price: getCurrentPrice(item),
           title: item.product.name,
           category: item.product.categories[0]?.name
         }));
@@ -245,23 +197,25 @@ export default function CheckoutModal() {
     const finalDeliveryFee = getDeliveryFee(selectedWilaya, deliveryMethod);
 
     try {
+      // Prices here are indicative only — /api/orders re-prices every line
+      // against live WooCommerce data before the order is created.
       const lineItems = singleProduct
-        ? unitAttributes.map(u => ({
+        ? unitAttributes.map((u, idx) => ({
             product_id: singleProduct.product.id,
             quantity: 1,
-            price: Math.round(discountedTotalPrice / numberOfUnits).toString(),
-            total: `${Math.round(discountedTotalPrice / numberOfUnits)}.00`,
+            price: unitPrices[idx].toString(),
+            total: `${unitPrices[idx]}.00`,
             meta_data: [
               ...(u.size && u.size !== 'Default' ? [{ key: 'size', value: u.size }] : []),
               ...(u.color ? [{ key: 'color', value: u.color }] : []),
-              ...(numberOfUnits > 1 ? [{ key: '_discount_applied', value: numberOfUnits === 2 ? '600DA total' : '900DA total' }] : [])
+              ...(bundleDiscount > 0 ? [{ key: '_discount_applied', value: `${bundleDiscount}DA total` }] : [])
             ]
           }))
         : items.map(item => ({
             product_id: item.product.id,
             quantity: item.quantity,
-            price: getCurrentPrice(item.product.id, item.product.price).toString(),
-            total: `${getCurrentPrice(item.product.id, item.product.price) * item.quantity}.00`,
+            price: getCurrentPrice(item).toString(),
+            total: `${getCurrentPrice(item) * item.quantity}.00`,
             meta_data: [
               ...(item.size && item.size !== 'Default' ? [{ key: 'size', value: item.size }] : []),
               ...(item.color ? [{ key: 'color', value: item.color }] : [])
@@ -399,7 +353,7 @@ export default function CheckoutModal() {
                       {[1, 2, 3].map((qty) => {
                         const fullPriceQty = basePrice * qty;
                         const discountedPrice = getDiscountedPrice(qty);
-                        const saveAmount = qty === 1 ? 0 : qty === 2 ? 600 : 900;
+                        const saveAmount = getBundleDiscount(singleProduct.product.slug, qty);
                         const perPiece = Math.round(discountedPrice / qty);
                         const isSelected = numberOfUnits === qty;
                         const isPopular = qty === 2;
@@ -622,12 +576,12 @@ export default function CheckoutModal() {
                                 {u.color && ` • ${u.color}`}
                               </span>
                               <span className="text-black font-medium">
-                                {Math.round(discountedTotalPrice / numberOfUnits).toLocaleString()} DA
+                                {(unitPrices[idx] ?? 0).toLocaleString()} DA
                               </span>
                             </div>
                           ))
                         : items.map((item, idx) => {
-                            const itemPrice = getCurrentPrice(item.product.id, item.product.price);
+                            const itemPrice = getCurrentPrice(item);
                             return (
                               <div key={idx} className={`flex justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
                                 <span className="text-gray-700">{item.product.name} × {item.quantity}</span>

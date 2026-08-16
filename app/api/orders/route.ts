@@ -1,6 +1,13 @@
 // app/api/orders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { TrackingEventData } from '@/types/tracking';
+import { getProductsByIds } from '@/lib/woocommerce';
+import { repriceLineItems } from '@/lib/order-pricing';
+
+// Orders must always be priced against live WooCommerce data, never a cached
+// snapshot of the catalog.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const WC_API_URL = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3`;
 const WC_CONSUMER_KEY = process.env.NEXT_PUBLIC_WOOCOMMERCE_CONSUMER_KEY || '';
@@ -80,6 +87,18 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'Missing required order data' },
         { status: 400 }
       );
+    }
+
+    // Authoritative pricing: recompute every line item from live WooCommerce
+    // data and ignore whatever the browser claimed the price was.
+    const { lineItems, warning } = await repriceLineItems(orderData.line_items, getProductsByIds);
+    orderData.line_items = lineItems;
+
+    if (warning) {
+      console.warn('Order repricing warning:', warning);
+      orderData.customer_note = [orderData.customer_note, `⚠️ ${warning}`]
+        .filter(Boolean)
+        .join('\n');
     }
 
     // Build WooCommerce API URL with authentication

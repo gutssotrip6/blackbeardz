@@ -9,7 +9,8 @@ import { getMetaPixel } from '@/lib/meta-pixel';
 import { getTikTokPixel } from '@/lib/tiktok-pixel';
 import { generateEventId } from '@/lib/tracking-utils';
 import { TrackingContentItem } from '@/types/tracking';
-import { getBundlePrice } from '@/lib/bundle-pricing';
+import { getBundleDiscount, getBundlePrice, getEffectiveUnitPrice, splitBundleTotal } from '@/lib/pricing';
+import { useLivePrices } from '@/app/hooks/useLivePrices';
 
 interface InlineCheckoutProps {
   product: Product;
@@ -76,12 +77,18 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
     });
   }, [numberOfUnits, selectedSize, selectedColor]);
 
-  const basePrice = parseInt(product.price.replace(/\D/g, ''));
+  // The server snapshot is correct at render time but goes stale in a tab left
+  // open; the live value wins as soon as it lands.
+  const { prices: livePrices } = useLivePrices([product.id]);
+  const basePrice = livePrices.get(product.id)?.unitPrice ?? getEffectiveUnitPrice(product);
 
-  // Calculate prices based on fixed discounts (or a per-product override)
+  // Bundle savings come off the live price — never a hardcoded total.
   const getDiscountedPrice = (qty: number) => getBundlePrice(product.slug, basePrice, qty);
 
   const discountedTotalPrice = getDiscountedPrice(numberOfUnits);
+  const bundleDiscount = getBundleDiscount(product.slug, numberOfUnits);
+  // Split so the per-unit lines always add back up to the advertised total.
+  const unitPrices = splitBundleTotal(discountedTotalPrice, numberOfUnits);
   const subtotal = discountedTotalPrice;
   const deliveryFee = deliveryMethod === 'bureau' ? bureauFee : domicileFee;
   const total = subtotal + deliveryFee;
@@ -136,10 +143,10 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
     if (!validatePhone()) return;
 
     const eventId = generateEventId();
-    const contents: TrackingContentItem[] = unitAttributes.map(u => ({
+    const contents: TrackingContentItem[] = unitAttributes.map((u, idx) => ({
       id: String(product.id),
       quantity: 1,
-      item_price: Math.round(discountedTotalPrice / numberOfUnits),
+      item_price: unitPrices[idx],
       title: product.name,
       category: product.categories[0]?.name
     }));
@@ -179,15 +186,17 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
           country: 'DZ'
         },
         customer_id: 0,
-        line_items: unitAttributes.map(u => ({
+        // Prices here are indicative only — /api/orders re-prices every line
+        // against live WooCommerce data before the order is created.
+        line_items: unitAttributes.map((u, idx) => ({
           product_id: product.id,
           quantity: 1,
-          price: Math.round(discountedTotalPrice / numberOfUnits).toString(),
-          total: `${Math.round(discountedTotalPrice / numberOfUnits)}.00`,
+          price: unitPrices[idx].toString(),
+          total: `${unitPrices[idx]}.00`,
           meta_data: [
             ...(u.size && u.size !== 'Default' ? [{ key: 'size', value: u.size }] : []),
             ...(u.color ? [{ key: 'color', value: u.color }] : []),
-            ...(numberOfUnits > 1 ? [{ key: '_discount_applied', value: numberOfUnits === 2 ? '600DA total' : '900DA total' }] : [])
+            ...(bundleDiscount > 0 ? [{ key: '_discount_applied', value: `${bundleDiscount}DA total` }] : [])
           ]
         })),
         shipping_lines: [
@@ -257,7 +266,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
             {[1, 2, 3].map((qty) => {
               const fullPriceQty = basePrice * qty;
               const discountedPrice = getDiscountedPrice(qty);
-              const saveAmount = qty === 1 ? 0 : qty === 2 ? 600 : 900;
+              const saveAmount = getBundleDiscount(product.slug, qty);
               const perPiece = Math.round(discountedPrice / qty);
               const isSelected = numberOfUnits === qty;
               const isPopular = qty === 2;
@@ -469,7 +478,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
                   {u.color && ` • ${u.color}`}
                 </span>
                 <span className="text-black font-medium">
-                  {Math.round(discountedTotalPrice / numberOfUnits).toLocaleString()} DA
+                  {(unitPrices[idx] ?? 0).toLocaleString()} DA
                 </span>
               </div>
             ))}
