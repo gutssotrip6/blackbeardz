@@ -215,11 +215,17 @@ export async function POST(request: NextRequest) {
       if (body.custom_data.content_name) customData.content_name = body.custom_data.content_name;
       if (body.custom_data.content_type) customData.content_type = body.custom_data.content_type;
       if (body.custom_data.contents) {
-        customData.contents = body.custom_data.contents.map(c => ({
-          id: String(c.id),
-          quantity: c.quantity,
-          item_price: c.item_price
-        }));
+        // Accept both content shapes — Meta's ({id, item_price}) and TikTok's
+        // ({content_id, price}) — so either caller can reuse this payload.
+        customData.contents = body.custom_data.contents.map(c => {
+          const meta = c as { id?: string | number; item_price?: number };
+          const tiktok = c as { content_id?: string; price?: number };
+          return {
+            id: String(meta.id ?? tiktok.content_id ?? ''),
+            quantity: c.quantity,
+            item_price: meta.item_price ?? tiktok.price ?? 0
+          };
+        });
       }
       if (body.custom_data.num_items !== undefined) customData.num_items = body.custom_data.num_items;
     }

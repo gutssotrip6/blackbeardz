@@ -6,7 +6,7 @@ import { Product } from '@/types/woocommerce';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { wilayasData } from '@/app/data/wilayas-data';
 import { getMetaPixel } from '@/lib/meta-pixel';
-import { getTikTokPixel } from '@/lib/tiktok-pixel';
+import { getTikTokPixel, getTikTokAttribution } from '@/lib/tiktok-pixel';
 import { generateEventId } from '@/lib/tracking-utils';
 import { TrackingContentItem } from '@/types/tracking';
 import { getBundleDiscount, getBundlePrice, getEffectiveUnitPrice, splitBundleTotal } from '@/lib/pricing';
@@ -154,8 +154,18 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
     try {
       const metaPixel = getMetaPixel();
       metaPixel.initiateCheckout(contents, subtotal, 'DZD', eventId);
-      
+
       const tiktokPixel = getTikTokPixel();
+      // Advanced matching: hand TikTok what we know about the shopper before
+      // the conversion events fire, so it can match them to a real person.
+      tiktokPixel.identify({
+        phone: phoneNumber,
+        first_name: firstName,
+        last_name: lastName,
+        city: selectedCity,
+        state: selectedWilaya,
+        country: 'DZ',
+      });
       tiktokPixel.initiateCheckout(contents, subtotal, 'DZD', eventId);
     } catch (error) {
       console.error('Failed to track InitiateCheckout event:', error);
@@ -206,7 +216,15 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
             total: deliveryFee.toString()
           }
         ],
-        status: 'processing'
+        status: 'processing',
+        // Attribution identifiers only exist in the browser. Handing them over
+        // lets the server-side conversion event tie this order back to the ad.
+        // Stripped from the payload before it reaches WooCommerce.
+        _tracking: {
+          ...getTikTokAttribution(),
+          event_source_url: typeof window !== 'undefined' ? window.location.href : undefined,
+          referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,
+        }
       };
 
       const response = await fetch('/api/orders', {
@@ -229,6 +247,10 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
         metaPixelPurchase.purchase(contents, purchaseValue, 'DZD', purchaseEventId);
 
         const tiktokPixelPurchase = getTikTokPixel();
+        // COD: the order is placed now, payment is collected on delivery.
+        // TikTok reports these as separate funnel steps, so both are sent —
+        // distinct event ids keep them from de-duplicating into each other.
+        tiktokPixelPurchase.placeAnOrder(contents, purchaseValue, 'DZD', `order-${purchaseEventId}`);
         tiktokPixelPurchase.purchase(contents, purchaseValue, 'DZD', purchaseEventId);
       } catch (trackErr) {
         console.error('Failed to track Purchase event:', trackErr);

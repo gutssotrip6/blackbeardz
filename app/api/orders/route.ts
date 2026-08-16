@@ -14,11 +14,29 @@ const WC_CONSUMER_KEY = process.env.NEXT_PUBLIC_WOOCOMMERCE_CONSUMER_KEY || '';
 const WC_CONSUMER_SECRET = process.env.NEXT_PUBLIC_WOOCOMMERCE_CONSUMER_SECRET || '';
 
 /**
+ * Attribution context handed over by the browser with the order.
+ *
+ * These identifiers (ad click ids, first-party cookies) only exist client-side,
+ * so a purely server-side conversion event would lose them — and with them, the
+ * link between the order and the ad that produced it.
+ */
+interface ClientTrackingContext {
+  ttclid?: string;
+  ttp?: string;
+  fbp?: string;
+  fbc?: string;
+  event_source_url?: string;
+  referrer?: string;
+}
+
+/**
  * Sends server-side tracking events to Meta and TikTok
  */
 async function sendServerTrackingEvents(
   orderData: any,
-  createdOrder: any
+  createdOrder: any,
+  request: NextRequest,
+  tracking?: ClientTrackingContext
 ): Promise<void> {
   const eventId = createdOrder.id.toString(); // Use order ID as event ID for deduplication
   const eventTime = Math.floor(Date.now() / 1000);
@@ -28,10 +46,20 @@ async function sendServerTrackingEvents(
     event_id: eventId,
     event_name: 'Purchase',
     event_time: eventTime,
-    event_source_url: process.env.NEXT_PUBLIC_SITE_URL,
+    event_source_url: tracking?.event_source_url || process.env.NEXT_PUBLIC_SITE_URL,
+    referrer: tracking?.referrer,
+    // Meta attribution cookies.
+    fbp: tracking?.fbp,
+    fbc: tracking?.fbc,
+    // TikTok attribution: the click id is what ties this order back to the ad.
+    // It only exists in the browser, so the checkout hands it over with the order.
+    ttclid: tracking?.ttclid,
+    ttp: tracking?.ttp,
     user_data: {
       email: orderData.billing?.email,
       phone: orderData.billing?.phone,
+      // The order id is a stable, non-PII identifier TikTok can match on.
+      external_id: eventId,
       first_name: orderData.billing?.first_name,
       last_name: orderData.billing?.last_name,
       city: orderData.billing?.city,
@@ -41,6 +69,7 @@ async function sendServerTrackingEvents(
     custom_data: {
       value: parseFloat(createdOrder.total),
       currency: 'DZD',
+      order_id: eventId,
       content_ids: orderData.line_items?.map((item: any) => String(item.product_id)),
       content_type: 'product',
       contents: orderData.line_items?.map((item: any) => ({
@@ -54,22 +83,39 @@ async function sendServerTrackingEvents(
     }
   };
 
+  // Forward the shopper's IP and user agent. Without this the tracking routes
+  // would see THIS server as the client (these are server-to-server calls),
+  // which wrecks match quality on both platforms.
+  const forwardedHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const clientIp =
+    request.headers.get('x-forwarded-for') ||
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-real-ip');
+  if (clientIp) forwardedHeaders['x-forwarded-for'] = clientIp;
+  const userAgent = request.headers.get('user-agent');
+  if (userAgent) forwardedHeaders['user-agent'] = userAgent;
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+
   // Send to Meta Conversions API
   try {
-    await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tracking/meta`, {
+    await fetch(`${baseUrl}/api/tracking/meta`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: forwardedHeaders,
       body: JSON.stringify(trackingPayload)
     });
   } catch (error) {
     console.error('Failed to send Meta server-side tracking:', error);
   }
 
-  // Send to TikTok Events API
+  // Send to TikTok Events API. The event name is translated to CompletePayment
+  // by the TikTok route — TikTok has no Purchase event.
   try {
-    await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tracking/tiktok`, {
+    await fetch(`${baseUrl}/api/tracking/tiktok`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: forwardedHeaders,
       body: JSON.stringify(trackingPayload)
     });
   } catch (error) {
@@ -79,7 +125,9 @@ async function sendServerTrackingEvents(
 
 export async function POST(request: NextRequest) {
   try {
-    const orderData = await request.json();
+    // `_tracking` is our own field, not WooCommerce's — pull it off before the
+    // rest of the body is forwarded to the store.
+    const { _tracking: clientTracking, ...orderData } = await request.json();
 
     // FIXED: Validate billing instead of customer (since we moved it to root level)
     if (!orderData.billing || !orderData.line_items || orderData.line_items.length === 0) {
@@ -140,7 +188,7 @@ export async function POST(request: NextRequest) {
     console.log('Order created successfully:', createdOrder.id);
 
     // Send server-side tracking events (Meta Conversions API & TikTok Events API)
-    await sendServerTrackingEvents(orderData, createdOrder);
+    await sendServerTrackingEvents(orderData, createdOrder, request, clientTracking);
 
     return NextResponse.json({
       success: true,

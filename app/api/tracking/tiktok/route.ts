@@ -1,99 +1,139 @@
 // app/api/tracking/tiktok/route.ts
-// Server-side TikTok Events API implementation
+// Server-side TikTok Events API 2.0 implementation.
+//
+// The browser pixel is routinely blocked by ad blockers, ITP and network
+// filters. This route is the copy of every event that cannot be blocked: it is
+// called from our own origin and forwards to TikTok server-to-server. Browser
+// and server events share an event_id, so TikTok de-duplicates them.
+//
+// Endpoint is v1.3 `event/track/` — the old v1.2 `pixel/events/` endpoint is
+// deprecated and takes a different payload shape.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { TrackingEventData, ServerTrackingResponse } from '@/types/tracking';
+import {
+  TrackingEventData,
+  ServerTrackingResponse,
+  TrackingContentItem,
+  TikTokContentItem,
+} from '@/types/tracking';
+import {
+  TIKTOK_EVENTS_API_URL,
+  TIKTOK_PIXEL_ID,
+  toTikTokEventName,
+} from '@/config/tracking';
 
-const TIKTOK_EVENTS_API_URL = 'https://business-api.tiktok.com/open_api/v1.2/pixel/events/';
+export const dynamic = 'force-dynamic';
 
-interface TikTokEvent {
+interface TikTokEventPayload {
   event: string;
   event_time: number;
   event_id: string;
-  context?: {
-    ad?: {
-      callback: string;
-    };
-    page?: {
-      url: string;
-    };
-    user?: {
-      external_id?: string;
-      phone?: string;
-      email?: string;
-      tt_identifiers?: Array<{
-        identifier: string;
-        value: string;
-      }>;
-    };
-  };
-  properties?: {
-    value?: number;
-    currency?: string;
-    content_id?: string;
-    content_name?: string;
-    content_type?: string;
-    contents?: Array<{
-      content_id: string;
-      quantity: number;
-      price: number;
-    }>;
-    quantity?: number;
-  };
+  user: Record<string, unknown>;
+  properties?: Record<string, unknown>;
+  page?: { url?: string; referrer?: string };
 }
 
 /**
- * Hashes a string using SHA-256 for TikTok Events API
- * TikTok requires normalized and hashed user data
+ * SHA-256 hex, as required for every piece of personal data TikTok receives.
+ * Values must be normalized (trimmed/lowercased) BEFORE hashing or the hash
+ * won't match TikTok's — which silently costs match quality.
  */
-async function hashData(data: string): Promise<string> {
-  if (!data) return '';
+async function hashData(value: string): Promise<string> {
+  if (!value) return '';
   const encoder = new TextEncoder();
-  const dataBuffer = encoder.encode(data.toLowerCase().trim());
-  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const buffer = await crypto.subtle.digest('SHA-256', encoder.encode(value));
+  return Array.from(new Uint8Array(buffer))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-/**
- * Normalizes phone number for hashing
- */
+/** TikTok expects E.164. Algerian locals (0XXXXXXXXX) become +213XXXXXXXXX. */
 function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, '').trim();
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('213')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+213${digits.slice(1)}`;
+  return `+${digits}`;
+}
+
+function normalizeLower(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 /**
- * Normalizes email for hashing
+ * Best-effort client IP.
+ *
+ * The request reaching this route comes from the shopper's browser, but behind
+ * a proxy/CDN the socket address is the proxy's — the original is in the
+ * forwarding headers. TikTok uses IP + user agent for matching, so an empty or
+ * wrong value measurably lowers attribution.
  */
-function normalizeEmail(email: string): string {
-  return email.toLowerCase().trim();
+function getClientIp(request: NextRequest): string | undefined {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return (
+    request.headers.get('cf-connecting-ip') ||
+    request.headers.get('x-real-ip') ||
+    undefined
+  );
 }
 
 /**
- * Sends event to TikTok Events API with retry logic
+ * Normalizes the two content shapes that reach this route into TikTok's.
+ *
+ * The TikTok pixel sends TikTok-shaped items ({content_id, price}); the order
+ * route sends Meta-shaped ones ({id, item_price}). Both must work.
+ */
+function normalizeContents(
+  contents: (TrackingContentItem | TikTokContentItem)[] | undefined
+): Array<Record<string, unknown>> | undefined {
+  if (!contents || contents.length === 0) return undefined;
+
+  return contents.map(item => {
+    const tiktokItem = item as TikTokContentItem;
+    const metaItem = item as TrackingContentItem;
+
+    return {
+      content_id: String(tiktokItem.content_id ?? metaItem.id ?? ''),
+      content_type: tiktokItem.content_type || 'product',
+      ...(tiktokItem.content_name || metaItem.title
+        ? { content_name: tiktokItem.content_name || metaItem.title }
+        : {}),
+      ...(tiktokItem.content_category || metaItem.category
+        ? { content_category: tiktokItem.content_category || metaItem.category }
+        : {}),
+      quantity: item.quantity ?? 1,
+      price: tiktokItem.price ?? metaItem.item_price ?? 0,
+    };
+  });
+}
+
+/**
+ * Posts to TikTok with exponential backoff.
+ *
+ * TikTok answers HTTP 200 with a non-zero `code` on business errors, so the
+ * status alone doesn't tell you whether the event landed — the body must be
+ * checked too, otherwise silently rejected events look like successes.
  */
 async function sendToTikTokAPI(
   pixelId: string,
   accessToken: string,
-  events: TikTokEvent[],
+  events: TikTokEventPayload[],
   testEventCode?: string
 ): Promise<any> {
-  const url = TIKTOK_EVENTS_API_URL;
-  
   const payload = {
-    pixel_id: pixelId,
-    events: events,
-    test_event_code: testEventCode || undefined,
-    timestamp: Math.floor(Date.now() / 1000)
+    event_source: 'web',
+    event_source_id: pixelId,
+    ...(testEventCode ? { test_event_code: testEventCode } : {}),
+    data: events,
   };
 
-  // Retry logic with exponential backoff
   const maxRetries = 3;
-  const baseDelay = 1000; // 1 second
+  const baseDelay = 1000;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(TIKTOK_EVENTS_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,31 +142,29 @@ async function sendToTikTokAPI(
         body: JSON.stringify(payload),
       });
 
-      const responseData = await response.json();
+      const responseData = await response.json().catch(() => ({}));
+      const isBusinessError = responseData?.code !== undefined && responseData.code !== 0;
 
-      if (!response.ok) {
-        const error = responseData.message || responseData.error || { message: 'Unknown error' };
-        console.error(`TikTok API attempt ${attempt} failed:`, error);
-        
+      if (!response.ok || isBusinessError) {
+        const message =
+          responseData?.message || responseData?.error || `HTTP ${response.status}`;
+        console.error(`TikTok API attempt ${attempt} failed:`, message, responseData);
+
         if (attempt < maxRetries) {
-          const delay = baseDelay * Math.pow(2, attempt - 1);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt - 1)));
           continue;
         }
-        
-        throw new Error(typeof error === 'string' ? error : JSON.stringify(error));
+        throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
       }
 
       return responseData;
     } catch (error) {
       console.error(`TikTok API attempt ${attempt} error:`, error);
-      
+
       if (attempt < maxRetries) {
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt - 1)));
         continue;
       }
-      
       throw error;
     }
   }
@@ -138,7 +176,6 @@ export async function POST(request: NextRequest) {
   try {
     const body: TrackingEventData = await request.json();
 
-    // Validate required fields
     if (!body.event_id || !body.event_name) {
       return NextResponse.json(
         { success: false, message: 'Missing required fields: event_id and event_name' },
@@ -146,92 +183,120 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get credentials from environment variables
-    const pixelId = process.env.TIKTOK_PIXEL_ID;
+    // Pixel id falls back to the committed config so the server side works even
+    // when the env var never reaches the process; the access token cannot.
+    const pixelId = process.env.TIKTOK_PIXEL_ID || TIKTOK_PIXEL_ID;
     const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
     const testEventCode = process.env.TIKTOK_TEST_EVENT_CODE;
 
-    if (!pixelId || !accessToken) {
-      console.error('TikTok Events API credentials not configured');
+    if (!accessToken) {
+      // Not an error the shopper should ever feel — the browser pixel still
+      // fired. Report it plainly so a missing token is visible in logs.
+      console.warn(
+        'TIKTOK_ACCESS_TOKEN not configured — server-side Events API disabled, browser pixel only'
+      );
       return NextResponse.json(
-        { success: false, message: 'TikTok credentials not configured' },
-        { status: 500 }
+        { success: false, message: 'TikTok access token not configured', platform: 'tiktok' },
+        { status: 200 }
       );
     }
 
-    // Prepare user data with hashing (required by TikTok)
-    const userContext: any = {};
-    if (body.user_data) {
-      const ttIdentifiers: Array<{ identifier: string; value: string }> = [];
-      
-      if (body.user_data.email) {
-        ttIdentifiers.push({
-          identifier: 'email',
-          value: await hashData(normalizeEmail(body.user_data.email))
-        });
-      }
-      if (body.user_data.phone) {
-        ttIdentifiers.push({
-          identifier: 'phone',
-          value: await hashData(normalizePhone(body.user_data.phone))
-        });
-      }
-      
-      if (ttIdentifiers.length > 0) {
-        userContext.tt_identifiers = ttIdentifiers;
-      }
+    // --- user block: everything TikTok matches on ---------------------------
+    const user: Record<string, unknown> = {};
+
+    if (body.user_data?.email) {
+      user.email = await hashData(normalizeLower(body.user_data.email));
+    }
+    if (body.user_data?.phone) {
+      user.phone = await hashData(normalizePhone(body.user_data.phone));
+    }
+    if (body.user_data?.external_id) {
+      user.external_id = await hashData(normalizeLower(body.user_data.external_id));
+    }
+    if (body.user_data?.first_name) {
+      user.first_name = await hashData(normalizeLower(body.user_data.first_name));
+    }
+    if (body.user_data?.last_name) {
+      user.last_name = await hashData(normalizeLower(body.user_data.last_name));
+    }
+    if (body.user_data?.city) user.city = await hashData(normalizeLower(body.user_data.city));
+    if (body.user_data?.state) user.state = await hashData(normalizeLower(body.user_data.state));
+    if (body.user_data?.country) {
+      user.country = await hashData(normalizeLower(body.user_data.country));
+    }
+    if (body.user_data?.zip_code) {
+      user.zip_code = await hashData(normalizeLower(body.user_data.zip_code));
     }
 
-    // Prepare properties (custom data)
-    const properties: any = {};
+    // Attribution identifiers are sent RAW — hashing them breaks the match.
+    if (body.ttclid) user.ttclid = body.ttclid;
+    if (body.ttp) user.ttp = body.ttp;
+
+    const clientIp = getClientIp(request);
+    if (clientIp) user.ip = clientIp;
+    const userAgent = request.headers.get('user-agent');
+    if (userAgent) user.user_agent = userAgent;
+
+    // --- properties block ---------------------------------------------------
+    const properties: Record<string, unknown> = {};
     if (body.custom_data) {
-      if (body.custom_data.value !== undefined) properties.value = body.custom_data.value;
-      if (body.custom_data.currency) properties.currency = body.custom_data.currency;
-      if (body.custom_data.content_ids && body.custom_data.content_ids.length > 0) {
-        properties.content_id = body.custom_data.content_ids[0];
+      const { custom_data } = body;
+
+      if (custom_data.value !== undefined) properties.value = custom_data.value;
+      if (custom_data.currency) properties.currency = custom_data.currency;
+      if (custom_data.content_type) properties.content_type = custom_data.content_type;
+      if (custom_data.content_name) properties.content_name = custom_data.content_name;
+      if (custom_data.content_category) properties.content_category = custom_data.content_category;
+      if (custom_data.order_id) properties.order_id = custom_data.order_id;
+
+      const contentId =
+        custom_data.content_id ||
+        (custom_data.content_ids && custom_data.content_ids[0]) ||
+        undefined;
+      if (contentId) properties.content_id = String(contentId);
+
+      const contents = normalizeContents(custom_data.contents);
+      if (contents) {
+        properties.contents = contents;
+        if (!properties.content_type) properties.content_type = 'product';
       }
-      if (body.custom_data.content_name) properties.content_name = body.custom_data.content_name;
-      if (body.custom_data.content_type) properties.content_type = body.custom_data.content_type;
-      if (body.custom_data.contents) {
-        properties.contents = body.custom_data.contents.map(c => ({
-          content_id: String(c.id),
-          quantity: c.quantity,
-          price: c.item_price
-        }));
-      }
-      if (body.custom_data.num_items !== undefined) properties.quantity = body.custom_data.num_items;
+
+      const quantity = custom_data.quantity ?? custom_data.num_items;
+      if (quantity !== undefined) properties.quantity = quantity;
     }
 
-    // Build TikTok event
-    const tiktokEvent: TikTokEvent = {
-      event: body.event_name,
+    const tiktokEvent: TikTokEventPayload = {
+      // Translate here too: the order route posts Meta-flavoured names, and
+      // TikTok has no Purchase event.
+      event: toTikTokEventName(body.event_name),
       event_time: body.event_time || Math.floor(Date.now() / 1000),
       event_id: body.event_id,
-      context: {
-        ...(body.event_source_url && { page: { url: body.event_source_url } }),
-        ...(Object.keys(userContext).length > 0 && { user: userContext })
-      },
-      ...(Object.keys(properties).length > 0 && { properties })
+      user,
+      ...(Object.keys(properties).length > 0 && { properties }),
+      ...((body.event_source_url || body.referrer) && {
+        page: {
+          ...(body.event_source_url && { url: body.event_source_url }),
+          ...(body.referrer && { referrer: body.referrer }),
+        },
+      }),
     };
 
-    // Send to TikTok API
-    const result = await sendToTikTokAPI(pixelId, accessToken, [tiktokEvent], testEventCode);
+    await sendToTikTokAPI(pixelId, accessToken, [tiktokEvent], testEventCode);
 
-    console.log('TikTok Events API event sent successfully:', body.event_name, body.event_id);
+    console.log('TikTok Events API event sent:', tiktokEvent.event, body.event_id);
 
     const response: ServerTrackingResponse = {
       success: true,
       eventId: body.event_id,
-      platform: 'tiktok'
+      platform: 'tiktok',
     };
-
     return NextResponse.json(response);
-
   } catch (error) {
     console.error('TikTok Events API error:', error);
     const response: ServerTrackingResponse = {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      platform: 'tiktok',
     };
     return NextResponse.json(response, { status: 500 });
   }
