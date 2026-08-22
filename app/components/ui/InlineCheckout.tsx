@@ -25,6 +25,7 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('0');
+  const [socialHandle, setSocialHandle] = useState('');
   const [selectedWilaya, setSelectedWilaya] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<'bureau' | 'domicile'>('bureau');
@@ -217,6 +218,9 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
           }
         ],
         status: 'processing',
+        meta_data: [
+          ...(socialHandle.trim() ? [{ key: '_social_handle', value: socialHandle.trim() }] : [])
+        ],
         // Attribution identifiers only exist in the browser. Handing them over
         // lets the server-side conversion event tie this order back to the ad.
         // Stripped from the payload before it reaches WooCommerce.
@@ -448,6 +452,15 @@ export default function InlineCheckout({ product, selectedSize, selectedColor, d
             disabled={isSubmitting}
           />
           {phoneError && <p className="text-red-600 text-xs mt-1">{phoneError}</p>}
+
+          {/* SOCIAL HANDLE (optional) */}
+          <input
+            placeholder={t('form.social')}
+            value={socialHandle}
+            onChange={(e) => setSocialHandle(e.target.value)}
+            className={inputClass}
+            disabled={isSubmitting}
+          />
 
           {/* WILAYA */}
           <select

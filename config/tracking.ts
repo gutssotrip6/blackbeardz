@@ -10,13 +10,10 @@
  * TikTok Pixel id (also called "Pixel Code" in TikTok Events Manager).
  * Used for both the browser pixel and the server-side Events API.
  *
- * Left empty on purpose — no pixel is live yet. Set NEXT_PUBLIC_TIKTOK_PIXEL_ID
- * (and TIKTOK_PIXEL_ID for the server side) in the hosting environment once a
- * real pixel is ready to go live; nothing else needs to change. When empty,
- * every call site below (layout.tsx, lib/tiktok-pixel.ts, the tracking route)
- * already no-ops instead of loading a pixel.
+ * Set NEXT_PUBLIC_TIKTOK_PIXEL_ID (and TIKTOK_PIXEL_ID for the server side)
+ * in the hosting environment to override this default without a code change.
  */
-const TIKTOK_PIXEL_ID_FALLBACK = '';
+const TIKTOK_PIXEL_ID_FALLBACK = '7648065853946118145';
 
 // NOTE: must be the exact `process.env.NEXT_PUBLIC_*` member expression so
 // Next.js inlines it into the client bundle at build time. Assigning to a
